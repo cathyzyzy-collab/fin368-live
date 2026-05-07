@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Exchange Rate Regimes &amp; Reserves</title>
+<link rel="stylesheet" href="_shared.css">
+</head>
+<body>
+
+<header>
+  <h1>Exchange Rate Regimes &amp; Reserves</h1>
+  <div class="sub">FX reserve stockpiles · Peg vs float classification · Currency anchors &nbsp;|&nbsp; <a href="index.html">← All modules</a></div>
+</header>
+
+<nav class="tabs">
+  <button data-tab="reserves" class="active">FX Reserves</button>
+  <button data-tab="regime">Regime Classification</button>
+</nav>
+
+<main>
+
+<!-- ═══ RESERVES ═══ -->
+<section id="reserves" class="tab active">
+  <h2>Foreign Exchange Reserves</h2>
+  <div class="desc">Total official foreign exchange reserves including gold (USD billions). Large reserves let central banks intervene in currency markets to defend pegs or smooth excessive volatility. China, Japan, and Switzerland hold the largest stockpiles relative to GDP.</div>
+
+  <div class="card">
+    <div class="canvas-wrap" style="height:440px"><canvas id="res-chart"></canvas></div>
+    <div class="asof" id="res-asof"><span class="loading">Loading…</span></div>
+  </div>
+
+  <div class="card">
+    <table id="res-table">
+      <thead><tr>
+        <th data-sort="name" data-dir="asc">Country</th>
+        <th data-sort="res">FX Reserves (USD bn)</th>
+        <th data-sort="year">Year</th>
+      </tr></thead>
+      <tbody><tr><td colspan="3" class="loading">Loading…</td></tr></tbody>
+    </table>
+    <div class="asof" id="res-table-asof"></div>
+  </div>
+</section>
+
+<!-- ═══ REGIME ═══ -->
+<section id="regime" class="tab">
+  <h2>Exchange Rate Regime Classification</h2>
+  <div class="desc">Regimes range from hard pegs (currency boards, dollarization) to free floats. Intermediate "managed float" regimes involve regular central bank intervention to smooth moves. Based on IMF Annual Report on Exchange Arrangements (AREAER); classifications updated annually and may lag policy changes by months.</div>
+
+  <div class="card">
+    <table id="reg-table">
+      <thead><tr>
+        <th data-sort="currency" data-dir="asc">Currency</th>
+        <th data-sort="country">Country / Region</th>
+        <th data-sort="regime">Regime</th>
+        <th data-sort="anchor">Anchor / Notes</th>
+        <th data-sort="flex">Flexibility</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="asof">IMF AREAER classification (static). Verify current status at <a href="https://www.imf.org/external/np/mfd/er/index.htm" target="_blank">imf.org</a>.</div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <strong>Sources:</strong>
+  <a href="https://data.worldbank.org" target="_blank">World Bank</a> FI.RES.TOTL.CD (FX reserves including gold, current USD) &nbsp;·&nbsp;
+  IMF <a href="https://www.imf.org/external/pubs/nft/2021/areaers/ar2021.pdf" target="_blank">AREAER</a> (regime classifications, updated annually).
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+<script src="_shared.js"></script>
+<script>
+initTabs();
+
+const RESERVE_COUNTRIES = [
+  { id: 'CHN', name: 'China' },
+  { id: 'JPN', name: 'Japan' },
+  { id: 'CHE', name: 'Switzerland' },
+  { id: 'IND', name: 'India' },
+  { id: 'RUS', name: 'Russia' },
+  { id: 'SAU', name: 'Saudi Arabia' },
+  { id: 'KOR', name: 'South Korea' },
+  { id: 'BRA', name: 'Brazil' },
+  { id: 'SGP', name: 'Singapore' },
+  { id: 'HKG', name: 'Hong Kong SAR' },
+  { id: 'DEU', name: 'Germany' },
+  { id: 'FRA', name: 'France' },
+  { id: 'MEX', name: 'Mexico' },
+  { id: 'GBR', name: 'United Kingdom' },
+  { id: 'THA', name: 'Thailand' },
+  { id: 'USA', name: 'United States' },
+];
+
+// flex: 1=hard peg, 2=soft peg, 3=managed, 4=lightly managed, 5=free float
+const REGIMES = [
+  { currency: 'HKD', country: 'Hong Kong SAR',  regime: 'Currency Board',         anchor: 'USD  (7.75 – 7.85)',          flex: 1 },
+  { currency: 'SAR', country: 'Saudi Arabia',    regime: 'Conventional Peg',        anchor: 'USD  (3.75)',                  flex: 1 },
+  { currency: 'AED', country: 'UAE',             regime: 'Conventional Peg',        anchor: 'USD  (3.6725)',                flex: 1 },
+  { currency: 'BHD', country: 'Bahrain',         regime: 'Conventional Peg',        anchor: 'USD  (0.376)',                 flex: 1 },
+  { currency: 'OMR', country: 'Oman',            regime: 'Conventional Peg',        anchor: 'USD  (0.3845)',                flex: 1 },
+  { currency: 'DKK', country: 'Denmark',         regime: 'Soft Peg (ERM II)',       anchor: 'EUR  (7.46038 ±2.25%)',        flex: 2 },
+  { currency: 'BGN', country: 'Bulgaria',        regime: 'Currency Board',          anchor: 'EUR  (1.95583)',               flex: 1 },
+  { currency: 'CNY', country: 'China',           regime: 'Managed Float',           anchor: 'USD basket (±2% daily band)', flex: 3 },
+  { currency: 'SGD', country: 'Singapore',       regime: 'Managed Float',           anchor: 'NEER currency basket',        flex: 3 },
+  { currency: 'INR', country: 'India',           regime: 'Managed Float',           anchor: '— (active RBI intervention)', flex: 3 },
+  { currency: 'KRW', country: 'South Korea',     regime: 'Managed Float',           anchor: '— (smoothing operations)',    flex: 3 },
+  { currency: 'MYR', country: 'Malaysia',        regime: 'Managed Float',           anchor: '— (basket reference)',        flex: 3 },
+  { currency: 'VND', country: 'Vietnam',         regime: 'Managed Float',           anchor: 'USD  (±5% annual band)',      flex: 3 },
+  { currency: 'IDR', country: 'Indonesia',       regime: 'Managed Float',           anchor: '— (Bank Indonesia)',          flex: 3 },
+  { currency: 'THB', country: 'Thailand',        regime: 'Managed Float',           anchor: '— (BOT intervention)',        flex: 3 },
+  { currency: 'TWD', country: 'Taiwan',          regime: 'Managed Float',           anchor: '— (steady-hand CBC)',         flex: 3 },
+  { currency: 'TRY', country: 'Turkey',          regime: 'Managed Float',           anchor: '— (TCMB intervention)',       flex: 4 },
+  { currency: 'JPY', country: 'Japan',           regime: 'Managed Float',           anchor: '— (verbal/rate intervention)',flex: 4 },
+  { currency: 'CHF', country: 'Switzerland',     regime: 'Managed Float',           anchor: '— (floor removed Jan 2015)',  flex: 4 },
+  { currency: 'USD', country: 'United States',   regime: 'Free Float',              anchor: '—',                           flex: 5 },
+  { currency: 'EUR', country: 'Eurozone',        regime: 'Free Float',              anchor: '—',                           flex: 5 },
+  { currency: 'GBP', country: 'United Kingdom',  regime: 'Free Float',              anchor: '—',                           flex: 5 },
+  { currency: 'CAD', country: 'Canada',          regime: 'Free Float',              anchor: '—',                           flex: 5 },
+  { currency: 'AUD', country: 'Australia',       regime: 'Free Float',              anchor: '—',                           flex: 5 },
+  { currency: 'SEK', country: 'Sweden',          regime: 'Free Float',              anchor: '—',                           flex: 5 },
+  { currency: 'NOK', country: 'Norway',          regime: 'Free Float',              anchor: '—',                           flex: 5 },
+  { currency: 'NZD', country: 'New Zealand',     regime: 'Free Float',              anchor: '—',                           flex: 5 },
+  { currency: 'BRL', country: 'Brazil',          regime: 'Free Float',              anchor: '—',                           flex: 5 },
+  { currency: 'MXN', country: 'Mexico',          regime: 'Free Float',              anchor: '—',                           flex: 5 },
+  { currency: 'ZAR', country: 'South Africa',    regime: 'Free Float',              anchor: '—',                           flex: 5 },
+  { currency: 'PLN', country: 'Poland',          regime: 'Free Float',              anchor: '—',                           flex: 5 },
+];
+
+const FLEX_LABEL = { 1: 'Hard peg', 2: 'Soft peg', 3: 'Managed', 4: 'Lightly managed', 5: 'Free float' };
+const FLEX_COLOR = { 1: '#c62828', 2: '#e65100', 3: '#e6a23c', 4: '#2e7d32', 5: '#1d4e89' };
+
+async function loadReserves() {
+  try {
+    const codes    = RESERVE_COUNTRIES.map(c => c.id).join(';');
+    const thisYear = new Date().getFullYear();
+    const url      = `https://api.worldbank.org/v2/country/${codes}/indicator/FI.RES.TOTL.CD?format=json&date=${thisYear - 5}:${thisYear}&per_page=500`;
+    const j        = await fetch(url).then(r => r.json());
+
+    const rows = RESERVE_COUNTRIES.map(c => {
+      const entries = (j[1] || []).filter(r => r.countryiso3code === c.id && r.value != null);
+      if (!entries.length) return null;
+      entries.sort((a, b) => +b.date - +a.date);
+      const best = entries[0];
+      return { name: c.name, id: c.id, res: +(best.value / 1e9).toFixed(1), year: best.date };
+    }).filter(Boolean).sort((a, b) => b.res - a.res);
+
+    const cRes = new Chart(document.getElementById('res-chart').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: rows.map(r => r.name),
+        datasets: [{ label: 'FX Reserves (USD bn)', data: rows.map(r => r.res),
+          backgroundColor: rows.map(r => r.res > 1000 ? '#1d4e89' : r.res > 200 ? '#4a90d9' : '#a8c8f0') }]
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: { y: { title: { display: true, text: 'USD billions' } } },
+        maintainAspectRatio: false
+      }
+    });
+    registerChart('reserves', cRes);
+
+    const latest = [...new Set(rows.map(r => r.year))].sort().reverse()[0];
+    document.getElementById('res-asof').textContent =
+      `World Bank FI.RES.TOTL.CD. Most recent year per country; latest available: ${latest}. Includes gold at market prices.`;
+
+    const renderRes = r => `<tr><td>${r.name}</td><td>$${fmt(r.res, 1)} bn</td><td>${r.year}</td></tr>`;
+    document.querySelector('#res-table tbody').innerHTML = rows.map(renderRes).join('');
+    initSortTable('res-table', rows, renderRes);
+    document.getElementById('res-table-asof').textContent = 'World Bank FI.RES.TOTL.CD.';
+
+  } catch (e) {
+    showErr('res-asof', 'Could not load reserve data: ' + e.message);
+  }
+}
+
+function loadRegimes() {
+  const sorted = [...REGIMES].sort((a, b) => a.flex - b.flex || a.currency.localeCompare(b.currency));
+  const renderReg = r => `<tr>
+    <td><strong>${r.currency}</strong></td>
+    <td>${r.country}</td>
+    <td><span style="background:${FLEX_COLOR[r.flex]};color:#fff;padding:2px 8px;border-radius:3px;font-size:12px;white-space:nowrap">${r.regime}</span></td>
+    <td style="font-size:13px;color:var(--muted)">${r.anchor}</td>
+    <td>${FLEX_LABEL[r.flex]}</td>
+  </tr>`;
+  document.querySelector('#reg-table tbody').innerHTML = sorted.map(renderReg).join('');
+  initSortTable('reg-table', REGIMES, renderReg);
+}
+
+loadReserves();
+loadRegimes();
+</script>
+</body>
+</html>

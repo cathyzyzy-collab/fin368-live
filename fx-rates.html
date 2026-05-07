@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Exchange Rates</title>
+<link rel="stylesheet" href="_shared.css">
+</head>
+<body>
+
+<header>
+  <h1>Exchange Rates</h1>
+  <div class="sub">Live ECB reference rates · 1-year change · Major currency pairs &nbsp;|&nbsp; <a href="index.html">← All modules</a></div>
+</header>
+
+<nav class="tabs">
+  <button data-tab="live" class="active">Live Rates vs USD</button>
+  <button data-tab="perf">1-Year Performance</button>
+  <button data-tab="cross">Cross Rates</button>
+</nav>
+
+<main>
+
+<!-- ═══ LIVE ═══ -->
+<section id="live" class="tab active">
+  <h2>Major Currencies vs US Dollar</h2>
+  <div class="desc">ECB reference rates, updated each business day. Rate = units of currency per 1 USD.</div>
+
+  <div class="card">
+    <div id="live-kpis"></div>
+    <div class="asof" id="live-asof"><span class="loading">Loading…</span></div>
+  </div>
+
+  <div class="card">
+    <h3>Sortable table</h3>
+    <table id="live-table">
+      <thead><tr>
+        <th data-sort="name" data-dir="asc">Currency</th>
+        <th data-sort="code">Code</th>
+        <th data-sort="rate">Rate (per 1 USD)</th>
+        <th data-sort="usdper1">1 unit in USD</th>
+      </tr></thead>
+      <tbody><tr><td colspan="4" class="loading">Loading…</td></tr></tbody>
+    </table>
+    <div class="asof" id="live-table-asof"></div>
+  </div>
+</section>
+
+<!-- ═══ PERFORMANCE ═══ -->
+<section id="perf" class="tab">
+  <h2>1-Year Performance vs USD</h2>
+  <div class="desc">How much has each currency appreciated or depreciated against the USD over the past 12 months? Positive = currency strengthened (USD weakened).</div>
+
+  <div class="card">
+    <div class="canvas-wrap" style="height:420px"><canvas id="perf-chart"></canvas></div>
+    <div class="asof" id="perf-asof"><span class="loading">Loading…</span></div>
+  </div>
+
+  <div class="card">
+    <h3>Detail</h3>
+    <table id="perf-table">
+      <thead><tr>
+        <th data-sort="name" data-dir="asc">Currency</th>
+        <th data-sort="code">Code</th>
+        <th data-sort="then">Rate 1yr ago</th>
+        <th data-sort="now">Rate today</th>
+        <th data-sort="chg">1-yr change</th>
+        <th data-sort="chgUsd">USD value change</th>
+      </tr></thead>
+      <tbody><tr><td colspan="6" class="loading">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ═══ CROSS RATES ═══ -->
+<section id="cross" class="tab">
+  <h2>Cross Rate Calculator</h2>
+  <div class="desc">Calculate an implied cross rate between any two currencies using live USD anchor rates (triangular arbitrage check).</div>
+
+  <div class="card">
+    <div class="row">
+      <label>Currency A <select id="cx-a"></select></label>
+      <label>Currency B <select id="cx-b"></select></label>
+      <button class="go" onclick="calcCross()">Calculate</button>
+    </div>
+    <div id="cx-out" style="margin-top:16px;font-size:16px;line-height:2"></div>
+    <div class="asof" id="cx-asof"></div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <strong>Source:</strong> <a href="https://frankfurter.dev" target="_blank">Frankfurter</a> — re-publishes ECB reference exchange rates. Updated every business day.
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+<script src="_shared.js"></script>
+<script>
+initTabs();
+
+const CURRENCIES = [
+  { code: 'EUR', name: 'Euro' }, { code: 'GBP', name: 'British Pound' },
+  { code: 'JPY', name: 'Japanese Yen' }, { code: 'CHF', name: 'Swiss Franc' },
+  { code: 'CAD', name: 'Canadian Dollar' }, { code: 'AUD', name: 'Australian Dollar' },
+  { code: 'CNY', name: 'Chinese Yuan' }, { code: 'MXN', name: 'Mexican Peso' },
+  { code: 'BRL', name: 'Brazilian Real' }, { code: 'INR', name: 'Indian Rupee' },
+  { code: 'KRW', name: 'South Korean Won' }, { code: 'SGD', name: 'Singapore Dollar' },
+  { code: 'HKD', name: 'Hong Kong Dollar' }, { code: 'SEK', name: 'Swedish Krona' },
+  { code: 'NOK', name: 'Norwegian Krone' }, { code: 'TRY', name: 'Turkish Lira' },
+];
+
+const SYMS = CURRENCIES.map(c => c.code).join(',');
+let liveRates = {}, liveDate = '', yearAgoRates = {};
+
+async function loadLive() {
+  try {
+    const r = await fetch(`https://api.frankfurter.dev/v1/latest?base=USD&symbols=${SYMS}`).then(r => r.json());
+    liveRates = r.rates; liveDate = r.date;
+
+    // KPI strip — top 8
+    const top = CURRENCIES.slice(0, 8);
+    document.getElementById('live-kpis').innerHTML = top.map(c => {
+      const rate = liveRates[c.code];
+      return `<div class="kpi"><div class="lbl">${c.name}</div><div class="val">${fmt(rate, rate > 100 ? 2 : 4)}</div><div style="font-size:12px;color:var(--muted)">${c.code}/USD</div></div>`;
+    }).join('');
+    document.getElementById('live-asof').textContent = `ECB reference rates as of ${liveDate}.`;
+    document.getElementById('live-table-asof').textContent = `ECB reference rates as of ${liveDate}.`;
+
+    // Table
+    const rows = CURRENCIES.map(c => ({ name: c.name, code: c.code, rate: liveRates[c.code], usdper1: 1 / liveRates[c.code] }));
+    const render = r => `<tr><td>${r.name}</td><td>${r.code}</td><td>${fmt(r.rate, r.rate > 100 ? 2 : 4)}</td><td>$${fmt(r.usdper1, 4)}</td></tr>`;
+    document.querySelector('#live-table tbody').innerHTML = rows.map(render).join('');
+    initSortTable('live-table', rows, render);
+
+    // Populate cross-rate dropdowns
+    ['cx-a', 'cx-b'].forEach((id, i) => {
+      const sel = document.getElementById(id);
+      sel.innerHTML = CURRENCIES.map(c => `<option value="${c.code}"${c.code === (i ? 'GBP' : 'EUR') ? ' selected' : ''}>${c.name} (${c.code})</option>`).join('');
+    });
+  } catch (e) { showErr('live-kpis', 'Could not load rates: ' + e.message); }
+}
+
+async function loadPerf() {
+  try {
+    const oneYearAgo = new Date(); oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+    const y = oneYearAgo.toISOString().slice(0, 10);
+    const r = await fetch(`https://api.frankfurter.dev/v1/${y}?base=USD&symbols=${SYMS}`).then(r => r.json());
+    yearAgoRates = r.rates;
+    const then = r.date;
+
+    const rows = CURRENCIES.map(c => {
+      const now = liveRates[c.code], ago = yearAgoRates[c.code];
+      if (!now || !ago) return null;
+      const chg = ((ago / now) - 1) * 100; // appreciation of currency vs USD
+      return { name: c.name, code: c.code, then: ago, now, chg, chgUsd: ((1/ago) - (1/now)) };
+    }).filter(Boolean).sort((a, b) => b.chg - a.chg);
+
+    const perfChart = new Chart(document.getElementById('perf-chart').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: rows.map(r => r.code),
+        datasets: [{ label: '1-yr % change vs USD', data: rows.map(r => +r.chg.toFixed(2)), backgroundColor: rows.map(r => r.chg >= 0 ? '#2e7d32' : '#c62828') }]
+      },
+      options: { plugins: { legend: { display: false } }, scales: { y: { title: { display: true, text: '% appreciation vs USD (+) / depreciation (−)' } } }, maintainAspectRatio: false }
+    });
+    registerChart('perf', perfChart);
+    document.getElementById('perf-asof').textContent = `Comparing ${then} to ${liveDate}. Positive = currency strengthened against USD.`;
+
+    const render = r => {
+      const cls = r.chg >= 0 ? 'pos' : 'neg';
+      return `<tr><td>${r.name}</td><td>${r.code}</td><td>${fmt(r.then, r.then > 100 ? 2 : 4)}</td><td>${fmt(r.now, r.now > 100 ? 2 : 4)}</td><td class="${cls}">${r.chg.toFixed(2)}%</td><td class="${cls}">${r.chgUsd >= 0 ? '+' : ''}${(r.chgUsd * 10000).toFixed(0)} bps per unit</td></tr>`;
+    };
+    document.querySelector('#perf-table tbody').innerHTML = rows.map(render).join('');
+    initSortTable('perf-table', rows, render);
+  } catch (e) { showErr('perf-asof', 'Could not load 1-year-ago rates: ' + e.message); }
+}
+
+function calcCross() {
+  const a = document.getElementById('cx-a').value, b = document.getElementById('cx-b').value;
+  if (a === b) { document.getElementById('cx-out').textContent = 'Select two different currencies.'; return; }
+  const ra = liveRates[a], rb = liveRates[b];
+  if (!ra || !rb) { document.getElementById('cx-out').textContent = 'Rates not loaded yet.'; return; }
+  const cross = rb / ra;
+  document.getElementById('cx-out').innerHTML =
+    `1 <b>${a}</b> = <b>${fmt(cross, cross > 100 ? 2 : 4)} ${b}</b><br>` +
+    `1 <b>${b}</b> = <b>${fmt(1 / cross, (1/cross) > 100 ? 2 : 4)} ${a}</b><br>` +
+    `<span style="font-size:13px;color:var(--muted)">Derived via USD: ${a}/USD = ${fmt(ra, 4)} · ${b}/USD = ${fmt(rb, 4)}</span>`;
+  document.getElementById('cx-asof').textContent = `ECB rates as of ${liveDate}.`;
+}
+
+(async () => { await loadLive(); loadPerf(); })();
+</script>
+</body>
+</html>

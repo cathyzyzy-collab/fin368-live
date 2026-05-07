@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FIN368 Ch 7 & 8 — Live PPP & Interest Rate Parity</title>
+<style>
+  :root { --ink:#1a1a1a; --bg:#fafaf7; --card:#fff; --line:#e3e3dc; --accent:#1d4e89; --good:#2e7d32; --bad:#c62828; --muted:#6b6b6b; }
+  * { box-sizing:border-box; }
+  body { font:16px/1.5 -apple-system,Segoe UI,Roboto,sans-serif; color:var(--ink); background:var(--bg); margin:0; padding:0; }
+  header { background:var(--accent); color:#fff; padding:18px 28px; }
+  header h1 { margin:0; font-size:22px; }
+  header .sub { font-size:13px; opacity:.85; margin-top:2px; }
+  nav.tabs { display:flex; gap:0; background:#fff; border-bottom:1px solid var(--line); padding:0 28px; position:sticky; top:0; z-index:10; }
+  nav.tabs button { background:none; border:0; padding:14px 20px; font-size:15px; cursor:pointer; color:var(--muted); border-bottom:3px solid transparent; }
+  nav.tabs button.active { color:var(--accent); border-bottom-color:var(--accent); font-weight:600; }
+  main { padding:24px 28px 60px; max-width:1200px; }
+  section.tab { display:none; }
+  section.tab.active { display:block; }
+  h2 { margin:0 0 6px; font-size:20px; }
+  .slide-ref { font-size:12px; color:var(--muted); margin-bottom:18px; font-style:italic; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:20px; margin-bottom:20px; }
+  .row { display:flex; gap:14px; flex-wrap:wrap; align-items:end; }
+  .row label { display:flex; flex-direction:column; font-size:13px; color:var(--muted); }
+  .row input, .row select { font-size:15px; padding:7px 10px; border:1px solid var(--line); border-radius:5px; background:#fff; min-width:120px; margin-top:3px; }
+  button.primary { background:var(--accent); color:#fff; border:0; padding:9px 18px; border-radius:5px; cursor:pointer; font-size:14px; }
+  button.primary:hover { opacity:.9; }
+  table { width:100%; border-collapse:collapse; font-size:14px; margin-top:12px; }
+  th, td { padding:8px 10px; border-bottom:1px solid var(--line); text-align:right; }
+  th:first-child, td:first-child { text-align:left; }
+  th { background:#f5f5ef; font-weight:600; cursor:pointer; user-select:none; }
+  th.sorted::after { content:" \25BE"; color:var(--accent); }
+  .pos { color:var(--good); }
+  .neg { color:var(--bad); }
+  .as-of { font-size:12px; color:var(--muted); margin-top:8px; }
+  .err { color:var(--bad); font-size:13px; padding:10px; background:#fff3f3; border:1px solid #f5c2c2; border-radius:5px; }
+  .loading { color:var(--muted); font-size:13px; }
+  canvas { max-height:380px; }
+  .kpi { display:inline-block; margin-right:30px; }
+  .kpi .lbl { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; }
+  .kpi .val { font-size:24px; font-weight:600; color:var(--ink); }
+  .kpi .delta { font-size:14px; margin-left:6px; }
+  .formula { font-family:Cambria,Georgia,serif; background:#f5f5ef; padding:10px 14px; border-radius:5px; font-size:15px; margin:10px 0; }
+  footer { color:var(--muted); font-size:12px; padding:16px 28px; border-top:1px solid var(--line); margin-top:40px; }
+  footer a { color:var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>FIN368 — Chapter 7 & 8: Purchasing Power Parity & Interest Rate Parity</h1>
+  <div class="sub">Live data dashboard. Replaces the static Big Mac, PPP, and IRP examples in <code>FIN368_CH7&amp;8.pptx</code>.</div>
+</header>
+
+<nav class="tabs">
+  <button data-tab="bigmac" class="active">1. Big Mac Index (PPP)</button>
+  <button data-tab="irp">2. Interest Rate Parity</button>
+  <button data-tab="realrates">3. Real Rate &amp; Inflation</button>
+</nav>
+
+<main>
+
+<!-- ============ BIG MAC ============ -->
+<section id="bigmac" class="tab active">
+  <h2>The Big Mac Index — Live PPP Snapshot</h2>
+  <div class="slide-ref">Replaces: "Big Mac costs Yuan 21 in China and $5.74 in US" / "Selected Rates from Big Mac Index" slides.</div>
+
+  <div class="card">
+    <div class="row">
+      <label>Spotlight country
+        <select id="bm-country"><option>(loading…)</option></select>
+      </label>
+      <button class="primary" onclick="bigmacFocus()">Show vs. US</button>
+    </div>
+    <div id="bm-kpis" style="margin-top:18px"></div>
+    <div id="bm-explain" style="margin-top:8px;font-size:14px;color:var(--muted)"></div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0">Over- and under-valuation vs. US Dollar</h3>
+    <canvas id="bm-chart"></canvas>
+    <div class="as-of" id="bm-asof"></div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0">All countries — sortable</h3>
+    <table id="bm-table">
+      <thead><tr>
+        <th data-sort="name" class="sorted">Country</th>
+        <th data-sort="local_price">Local price</th>
+        <th data-sort="dollar_ex">Mkt FX (per USD)</th>
+        <th data-sort="implied">Implied PPP rate</th>
+        <th data-sort="dollar_price">USD price</th>
+        <th data-sort="USD_raw">vs USD (%)</th>
+      </tr></thead>
+      <tbody><tr><td colspan="6" class="loading">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============ IRP ============ -->
+<section id="irp" class="tab">
+  <h2>Interest Rate Parity — Live Forward-Rate Calculator</h2>
+  <div class="slide-ref">Replaces: covered IRP / forward premium examples in CH7&amp;8 slides. Spot rate is pulled live from the ECB.</div>
+
+  <div class="card">
+    <div class="formula">F = S &times; (1 + i<sub>quote</sub>) / (1 + i<sub>base</sub>) &nbsp;&nbsp;&nbsp; (covered IRP, annual basis)</div>
+    <div class="row" style="margin-top:14px">
+      <label>Base currency
+        <select id="irp-base"><option value="USD" selected>USD</option><option>EUR</option><option>GBP</option><option>JPY</option><option>CHF</option><option>CAD</option><option>AUD</option><option>CNY</option></select>
+      </label>
+      <label>Quote currency
+        <select id="irp-quote"><option>USD</option><option value="EUR" selected>EUR</option><option>GBP</option><option>JPY</option><option>CHF</option><option>CAD</option><option>AUD</option><option>CNY</option></select>
+      </label>
+      <label>Tenor (years)
+        <input id="irp-t" type="number" value="1" step="0.25" min="0.083">
+      </label>
+      <label>Base interest rate (% p.a.)
+        <input id="irp-ib" type="number" value="4.30" step="0.05">
+      </label>
+      <label>Quote interest rate (% p.a.)
+        <input id="irp-iq" type="number" value="2.40" step="0.05">
+      </label>
+      <button class="primary" onclick="irpCompute()">Compute</button>
+    </div>
+    <div class="as-of" id="irp-asof">Spot rate: loading…</div>
+  </div>
+
+  <div class="card" id="irp-out" style="display:none">
+    <div id="irp-kpis"></div>
+    <div id="irp-interp" style="margin-top:12px;font-size:14.5px;line-height:1.6"></div>
+  </div>
+</section>
+
+<!-- ============ REAL RATES ============ -->
+<section id="realrates" class="tab">
+  <h2>Inflation &amp; Real Interest Rates — Major Economies</h2>
+  <div class="slide-ref">Supporting context for PPP discussion: inflation differentials drive long-run FX moves.</div>
+
+  <div class="card">
+    <h3 style="margin-top:0">Latest CPI Inflation (%, year-on-year)</h3>
+    <canvas id="rr-cpi"></canvas>
+    <div class="as-of" id="rr-cpi-asof"></div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0">Real Interest Rate (%) — most recent World Bank reading</h3>
+    <canvas id="rr-real"></canvas>
+    <div class="as-of" id="rr-real-asof"></div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <strong>Data sources:</strong>
+  <a href="https://github.com/TheEconomist/big-mac-data" target="_blank">The Economist — Big Mac Index</a> ·
+  <a href="https://frankfurter.dev" target="_blank">Frankfurter (ECB FX)</a> ·
+  <a href="https://data.imf.org" target="_blank">IMF DataMapper</a> ·
+  <a href="https://data.worldbank.org" target="_blank">World Bank Open Data</a>.
+  All endpoints are free, public, and CORS-enabled. Page makes only GET requests; nothing is uploaded.
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script>
+'use strict';
+
+// ----- Tab nav -----
+const charts = {}; // tabId -> [Chart instances]
+document.querySelectorAll('nav.tabs button').forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll('nav.tabs button').forEach(x => x.classList.toggle('active', x === b));
+    document.querySelectorAll('section.tab').forEach(s => s.classList.toggle('active', s.id === b.dataset.tab));
+    (charts[b.dataset.tab] || []).forEach(c => c && c.resize());
+  };
+});
+const registerChart = (tabId, c) => { (charts[tabId] = charts[tabId] || []).push(c); };
+
+// ----- Helpers -----
+const fmt = (n, d=2) => n == null || isNaN(n) ? '—' : Number(n).toLocaleString(undefined, {minimumFractionDigits:d, maximumFractionDigits:d});
+const pct = (n, d=1) => n == null || isNaN(n) ? '—' : `${(n*100).toFixed(d)}%`;
+const showErr = (id, msg) => { document.getElementById(id).innerHTML = `<div class="err">${msg}</div>`; };
+
+// =================== BIG MAC ===================
+let bmRows = [];
+let bmChart = null;
+let bmSort = { key:'USD_raw', dir:1 };
+
+async function loadBigMac() {
+  try {
+    const url = 'https://raw.githubusercontent.com/TheEconomist/big-mac-data/master/output-data/big-mac-full-index.csv';
+    const csv = await fetch(url).then(r => r.text());
+    const parsed = Papa.parse(csv, { header:true, dynamicTyping:true, skipEmptyLines:true });
+    const latestDate = parsed.data.reduce((a, r) => r.date > a ? r.date : a, '');
+    bmRows = parsed.data.filter(r => r.date === latestDate && r.local_price != null);
+    const usa = bmRows.find(r => r.iso_a3 === 'USA');
+    bmRows.forEach(r => { r.implied = usa ? r.local_price / usa.local_price : null; });
+
+    document.getElementById('bm-asof').textContent =
+      `Source: The Economist — Big Mac Index, snapshot ${latestDate}. ${bmRows.length} countries.`;
+
+    // Country dropdown
+    const sel = document.getElementById('bm-country');
+    sel.innerHTML = '';
+    bmRows.slice().sort((a,b) => a.name.localeCompare(b.name)).forEach(r => {
+      const o = document.createElement('option');
+      o.value = r.iso_a3; o.textContent = r.name;
+      sel.appendChild(o);
+    });
+    sel.value = 'CHN';
+    bigmacFocus();
+
+    drawBmChart();
+    drawBmTable();
+  } catch (e) {
+    showErr('bm-kpis', 'Could not load Big Mac data. Check your internet connection. ' + e.message);
+  }
+}
+
+function bigmacFocus() {
+  const iso = document.getElementById('bm-country').value;
+  const r = bmRows.find(x => x.iso_a3 === iso);
+  const usa = bmRows.find(x => x.iso_a3 === 'USA');
+  if (!r || !usa) return;
+  const cls = r.USD_raw < 0 ? 'neg' : 'pos';
+  const word = r.USD_raw < 0 ? 'undervalued' : 'overvalued';
+  document.getElementById('bm-kpis').innerHTML =
+    `<div class="kpi"><div class="lbl">Local price</div><div class="val">${r.currency_code} ${fmt(r.local_price)}</div></div>` +
+    `<div class="kpi"><div class="lbl">Market FX (per USD)</div><div class="val">${fmt(r.dollar_ex, 4)}</div></div>` +
+    `<div class="kpi"><div class="lbl">Implied PPP rate</div><div class="val">${fmt(r.implied, 4)}</div></div>` +
+    `<div class="kpi"><div class="lbl">Big Mac in USD</div><div class="val">$${fmt(r.dollar_price)}</div></div>` +
+    `<div class="kpi"><div class="lbl">vs USD</div><div class="val ${cls}">${(r.USD_raw*100).toFixed(1)}%</div></div>`;
+  document.getElementById('bm-explain').innerHTML =
+    `A Big Mac costs <b>${r.currency_code} ${fmt(r.local_price)}</b> in ${r.name} and <b>$${fmt(usa.local_price)}</b> in the United States. ` +
+    `PPP would imply an exchange rate of <b>${fmt(r.implied, 4)} ${r.currency_code}/USD</b>; the market rate is <b>${fmt(r.dollar_ex, 4)}</b>. ` +
+    `By this measure the ${r.currency_code} is <b class="${cls}">${Math.abs(r.USD_raw*100).toFixed(1)}% ${word}</b> against the USD.`;
+}
+
+function drawBmChart() {
+  const sorted = bmRows.slice().sort((a,b) => a.USD_raw - b.USD_raw);
+  const labels = sorted.map(r => r.name);
+  const vals = sorted.map(r => +(r.USD_raw*100).toFixed(1));
+  const colors = vals.map(v => v < 0 ? '#c62828' : '#2e7d32');
+  const ctx = document.getElementById('bm-chart').getContext('2d');
+  document.getElementById('bm-chart').parentElement.style.height = Math.max(400, sorted.length * 14) + 'px';
+  if (bmChart) bmChart.destroy();
+  bmChart = new Chart(ctx, {
+    type:'bar',
+    data:{ labels, datasets:[{ label:'% over/under-valued vs USD', data:vals, backgroundColor:colors }] },
+    options:{ indexAxis:'y', plugins:{ legend:{ display:false } },
+      scales:{ x:{ title:{ display:true, text:'% over (positive) / under (negative) valued vs USD' } },
+               y:{ ticks:{ font:{ size:10 } } } },
+      maintainAspectRatio:false
+    }
+  });
+  registerChart('bigmac', bmChart);
+}
+
+function drawBmTable() {
+  const tbody = document.querySelector('#bm-table tbody');
+  const arr = bmRows.slice().sort((a,b) => {
+    const va = a[bmSort.key], vb = b[bmSort.key];
+    if (typeof va === 'string') return va.localeCompare(vb) * bmSort.dir;
+    return ((va ?? 0) - (vb ?? 0)) * bmSort.dir;
+  });
+  tbody.innerHTML = arr.map(r => {
+    const cls = r.USD_raw < 0 ? 'neg' : 'pos';
+    return `<tr>
+      <td>${r.name}</td>
+      <td>${r.currency_code} ${fmt(r.local_price)}</td>
+      <td>${fmt(r.dollar_ex, 4)}</td>
+      <td>${fmt(r.implied, 4)}</td>
+      <td>$${fmt(r.dollar_price)}</td>
+      <td class="${cls}">${(r.USD_raw*100).toFixed(1)}%</td>
+    </tr>`;
+  }).join('');
+}
+
+document.querySelectorAll('#bm-table th').forEach(th => {
+  th.onclick = () => {
+    const k = th.dataset.sort;
+    if (bmSort.key === k) bmSort.dir *= -1;
+    else { bmSort.key = k; bmSort.dir = (k === 'name') ? 1 : -1; }
+    document.querySelectorAll('#bm-table th').forEach(x => x.classList.toggle('sorted', x === th));
+    drawBmTable();
+  };
+});
+
+// =================== IRP ===================
+let irpSpot = null;
+let irpSpotDate = null;
+
+async function loadSpot() {
+  const base = document.getElementById('irp-base').value;
+  const quote = document.getElementById('irp-quote').value;
+  if (base === quote) {
+    document.getElementById('irp-asof').textContent = 'Pick two different currencies.';
+    irpSpot = null; return;
+  }
+  try {
+    const url = `https://api.frankfurter.dev/v1/latest?base=${base}&symbols=${quote}`;
+    const r = await fetch(url).then(r => r.json());
+    irpSpot = r.rates[quote];
+    irpSpotDate = r.date;
+    document.getElementById('irp-asof').textContent =
+      `Spot rate ${base}/${quote} = ${fmt(irpSpot, 4)} (ECB reference rate, ${r.date}).`;
+  } catch (e) {
+    document.getElementById('irp-asof').innerHTML = `<span class="err">Could not fetch live spot. ${e.message}</span>`;
+    irpSpot = null;
+  }
+}
+
+function irpCompute() {
+  if (irpSpot == null) { alert('Live spot rate is unavailable — check connection and try again.'); return; }
+  const base = document.getElementById('irp-base').value;
+  const quote = document.getElementById('irp-quote').value;
+  const t = parseFloat(document.getElementById('irp-t').value);
+  const ib = parseFloat(document.getElementById('irp-ib').value) / 100;
+  const iq = parseFloat(document.getElementById('irp-iq').value) / 100;
+  // Frankfurter returns "quote per 1 base". Forward in same convention:
+  //   F (quote/base) = S × (1 + i_quote) / (1 + i_base)
+  const F = irpSpot * Math.pow((1 + iq), t) / Math.pow((1 + ib), t);
+  // Premium/discount on the BASE currency in the forward.
+  // Positive ⇒ 1 base buys MORE quote forward ⇒ base appreciates ⇒ base at premium.
+  // Negative ⇒ base depreciates ⇒ base at discount.
+  const basePremium = (F / irpSpot) - 1;
+  const baseHigherRate = ib > iq;
+
+  document.getElementById('irp-out').style.display = 'block';
+  document.getElementById('irp-kpis').innerHTML =
+    `<div class="kpi"><div class="lbl">Spot</div><div class="val">1 ${base} = ${fmt(irpSpot, 4)} ${quote}</div></div>` +
+    `<div class="kpi"><div class="lbl">${t}-yr implied forward</div><div class="val">1 ${base} = ${fmt(F, 4)} ${quote}</div></div>` +
+    `<div class="kpi"><div class="lbl">${base} forward ${basePremium >= 0 ? 'premium' : 'discount'} (annualized)</div>` +
+      `<div class="val ${basePremium<0?'neg':'pos'}">${(basePremium*100).toFixed(2)}%</div></div>`;
+
+  const direction = baseHigherRate
+    ? `<b>${base}</b> has the <b>higher</b> interest rate (${(ib*100).toFixed(2)}% vs ${(iq*100).toFixed(2)}% on ${quote}), so under covered IRP it must trade at a <b>forward discount</b> against ${quote}: 1 ${base} buys fewer ${quote} forward than today. Equivalently, ${quote} is at a forward <b>premium</b>.`
+    : `<b>${base}</b> has the <b>lower</b> interest rate (${(ib*100).toFixed(2)}% vs ${(iq*100).toFixed(2)}% on ${quote}), so under covered IRP it must trade at a <b>forward premium</b> against ${quote}: 1 ${base} buys more ${quote} forward than today. Equivalently, ${quote} is at a forward <b>discount</b>.`;
+  document.getElementById('irp-interp').innerHTML =
+    `Under covered IRP, the no-arbitrage ${t}-year forward is <b>1 ${base} = ${fmt(F,4)} ${quote}</b>, vs. spot of <b>${fmt(irpSpot,4)} ${quote}</b>. ` + direction +
+    ` If a quoted market forward differs materially from this fair value, a covered-arbitrage trade is implied — borrow the low-yield currency, convert at spot, lend the high-yield currency, lock in the offsetting forward.`;
+}
+
+document.getElementById('irp-base').addEventListener('change', loadSpot);
+document.getElementById('irp-quote').addEventListener('change', loadSpot);
+
+// =================== REAL RATES ===================
+// Countries with OECD short-rate data AND broad IMF inflation coverage.
+// DEU serves as Eurozone proxy (ECB sets its short rate; Germany's CPI tracks ECB closely).
+const RR_COUNTRIES = [
+  { imf:'USA', oecd:'USA', name:'United States' },
+  { imf:'JPN', oecd:'JPN', name:'Japan' },
+  { imf:'GBR', oecd:'GBR', name:'United Kingdom' },
+  { imf:'CAN', oecd:'CAN', name:'Canada' },
+  { imf:'AUS', oecd:'AUS', name:'Australia' },
+  { imf:'DEU', oecd:'DEU', name:'Germany (Eurozone)' },
+  { imf:'MEX', oecd:'MEX', name:'Mexico' },
+];
+
+// Parse OECD SDMX-JSON: returns { COUNTRY_CODE: { value, period } } keeping the most recent obs.
+function parseOecdLatest(json) {
+  const dims = json.data.structures[0].dimensions.observation;
+  const obs   = json.data.dataSets[0].observations || {};
+  const cDim  = dims.findIndex(d => d.id === 'REF_AREA');
+  const tDim  = dims.length - 1;
+  const result = {};
+  for (const [key, val] of Object.entries(obs)) {
+    const idx = key.split(':').map(x => x === '~' ? null : +x);
+    const country = dims[cDim].values[idx[cDim]].id;
+    const period  = dims[tDim].values[idx[tDim]].id;
+    if (val[0] == null) continue;
+    if (!result[country] || period > result[country].period)
+      result[country] = { value: val[0], period };
+  }
+  return result;
+}
+
+async function loadRatesAndInflation() {
+  const thisYear = new Date().getFullYear();
+  const oecdCodes = RR_COUNTRIES.map(c => c.oecd).join('+');
+  const imfCodes  = RR_COUNTRIES.map(c => c.imf).join('/');
+
+  // Fetch both in parallel; handle failures independently.
+  const [nominalRes, inflRes] = await Promise.allSettled([
+    fetch(`https://sdmx.oecd.org/public/rest/data/OECD.SDD.STES,DSD_STES@DF_FINMARK,4.0/${oecdCodes}.M.IR3TIB.PA.....?lastNObservations=1&dimensionAtObservation=AllDimensions&format=jsondata`)
+      .then(r => r.json()).then(parseOecdLatest),
+    fetch(`https://www.imf.org/external/datamapper/api/v1/PCPIPCH/${imfCodes}`)
+      .then(r => r.json()).then(json => {
+        const series = (json.values || {}).PCPIPCH || {};
+        const out = {};
+        for (const [iso, data] of Object.entries(series)) {
+          for (let y = thisYear; y >= thisYear - 2; y--) {
+            if (data[y] != null) { out[iso] = { value: data[y], year: y }; break; }
+          }
+        }
+        return out;
+      })
+  ]);
+
+  const nominalOk = nominalRes.status === 'fulfilled';
+  const inflOk    = inflRes.status   === 'fulfilled';
+  const nominal   = nominalOk ? nominalRes.value : {};
+  const inflation = inflOk   ? inflRes.value   : {};
+
+  // ---- Inflation chart (IMF: current-year estimate/forecast) ----
+  const cpiOut = RR_COUNTRIES.map(c => {
+    const r = inflation[c.imf];
+    return r ? { name: c.name, val: r.value, year: r.year } : null;
+  }).filter(Boolean).sort((a,b) => b.val - a.val);
+
+  if (cpiOut.length) {
+    document.getElementById('rr-cpi').parentElement.style.height = '360px';
+    const cpiChart = new Chart(document.getElementById('rr-cpi').getContext('2d'), {
+      type: 'bar',
+      data: { labels: cpiOut.map(x => `${x.name} (${x.year})`), datasets: [{
+        label: 'CPI %', data: cpiOut.map(x => +x.val.toFixed(1)),
+        backgroundColor: cpiOut.map(x => x.val > 5 ? '#c62828' : x.val > 2.5 ? '#e6a23c' : '#2e7d32')
+      }] },
+      options: { indexAxis:'y', plugins:{ legend:{ display:false } }, maintainAspectRatio:false }
+    });
+    registerChart('realrates', cpiChart);
+    const src = inflOk ? 'IMF DataMapper (PCPIPCH — current year estimate/forecast)' : 'unavailable (CORS blocked from localhost; opens correctly from a local file)';
+    document.getElementById('rr-cpi-asof').textContent = `Source: ${src}. Current-year value includes IMF estimates where actuals aren't yet filed.`;
+  } else {
+    showErr('rr-cpi-asof', inflOk
+      ? 'No inflation data returned.'
+      : 'IMF inflation blocked by browser CORS (localhost). Open ch7-8.html as a local file (double-click) instead of via a server.');
+  }
+
+  // ---- Real rate chart: nominal (OECD monthly) − inflation (IMF annual) ----
+  const realOut = RR_COUNTRIES.map(c => {
+    const n = nominal[c.oecd];
+    const i = inflation[c.imf];
+    if (!n || !i) return null;
+    return { name: c.name, nominal: n.value, inflation: i.value, period: n.period,
+             real: +(n.value - i.value).toFixed(1) };
+  }).filter(Boolean).sort((a,b) => b.real - a.real);
+
+  if (realOut.length) {
+    document.getElementById('rr-real').parentElement.style.height = '360px';
+    const realChart = new Chart(document.getElementById('rr-real').getContext('2d'), {
+      type: 'bar',
+      data: { labels: realOut.map(x => `${x.name} (rate ${x.period})`), datasets: [{
+        label: 'Real rate %', data: realOut.map(x => x.real),
+        backgroundColor: realOut.map(x => x.real < 0 ? '#c62828' : '#1d4e89')
+      }] },
+      options: {
+        indexAxis: 'y', maintainAspectRatio: false,
+        plugins: { legend:{ display:false },
+          tooltip: { callbacks: { afterLabel: ctx => {
+            const r = realOut[ctx.dataIndex];
+            return `Nominal: ${r.nominal.toFixed(2)}%  Inflation: ${r.inflation.toFixed(1)}%`;
+          }}}
+        }
+      }
+    });
+    registerChart('realrates', realChart);
+    const notes = [];
+    if (nominalOk) notes.push('OECD 3-month interbank rate (IR3TIB, monthly)');
+    if (inflOk)    notes.push('IMF current-year inflation (PCPIPCH)');
+    document.getElementById('rr-real-asof').textContent =
+      `Approximate real rate = nominal short rate − inflation. Sources: ${notes.join(' · ')}. Hover for breakdown.`;
+  } else {
+    showErr('rr-real-asof', 'Could not compute real rates — one or both data sources unavailable.');
+  }
+}
+
+// ----- Init -----
+loadBigMac();
+loadSpot();
+loadRatesAndInflation();
+</script>
+
+</body>
+</html>

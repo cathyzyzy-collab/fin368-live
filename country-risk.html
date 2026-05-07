@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Country Risk Analysis</title>
+<link rel="stylesheet" href="_shared.css">
+</head>
+<body>
+
+<header>
+  <h1>Country Risk Analysis</h1>
+  <div class="sub">GDP per capita · CPI inflation · Current account balance · Comparative rankings &nbsp;|&nbsp; <a href="index.html">← All modules</a></div>
+</header>
+
+<nav class="tabs">
+  <button data-tab="income" class="active">Income & GDP</button>
+  <button data-tab="macro">Inflation & External</button>
+  <button data-tab="compare">Country Comparison</button>
+</nav>
+
+<main>
+
+<!-- ═══ INCOME ═══ -->
+<section id="income" class="tab active">
+  <h2>GDP per Capita</h2>
+  <div class="desc">GDP per capita (current USD) is the broadest proxy for income level and economic development. Countries above ~$12,000 are classified as high-income by the World Bank. Higher per-capita income generally correlates with lower political and credit risk.</div>
+
+  <div class="card">
+    <div class="canvas-wrap" style="height:420px"><canvas id="gdp-chart"></canvas></div>
+    <div class="asof" id="gdp-asof"><span class="loading">Loading…</span></div>
+  </div>
+</section>
+
+<!-- ═══ MACRO ═══ -->
+<section id="macro" class="tab">
+  <h2>Inflation &amp; External Balance</h2>
+  <div class="desc">Inflation erodes purchasing power and signals monetary (in)stability. The current account (% of GDP) measures net flows of goods, services and transfers. Persistent deficits must be financed externally and can create currency vulnerability.</div>
+
+  <div class="card">
+    <h3>CPI Inflation (%)</h3>
+    <div class="canvas-wrap" style="height:340px"><canvas id="inf-chart"></canvas></div>
+    <div class="asof" id="inf-asof"><span class="loading">Loading…</span></div>
+  </div>
+
+  <div class="card">
+    <h3>Current Account Balance (% of GDP)</h3>
+    <div class="canvas-wrap" style="height:340px"><canvas id="ca-chart"></canvas></div>
+    <div class="asof" id="ca-asof"><span class="loading">Loading…</span></div>
+  </div>
+</section>
+
+<!-- ═══ COMPARE ═══ -->
+<section id="compare" class="tab">
+  <h2>Country Comparison</h2>
+  <div class="desc">All indicators in one sortable table. Click any column header to rank countries. Colors: green = lower risk, amber = moderate, red = elevated. Data from World Bank; annual series with 1–2 year publication lag.</div>
+
+  <div class="card">
+    <table id="risk-table">
+      <thead><tr>
+        <th data-sort="name" data-dir="asc">Country</th>
+        <th data-sort="gdppc">GDP per capita (USD)</th>
+        <th data-sort="inf">Inflation (%)</th>
+        <th data-sort="ca">Current account (% GDP)</th>
+      </tr></thead>
+      <tbody><tr><td colspan="4" class="loading">Loading…</td></tr></tbody>
+    </table>
+    <div class="asof" id="table-asof"></div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <strong>Source:</strong> <a href="https://data.worldbank.org" target="_blank">World Bank Open Data</a> —
+  NY.GDP.PCAP.CD (GDP per capita, current USD) ·
+  FP.CPI.TOTL.ZG (CPI inflation, annual %) ·
+  BN.CAB.XOKA.GD.ZS (current account, % GDP).
+  Annual; ~1–2 year publication lag.
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+<script src="_shared.js"></script>
+<script>
+initTabs();
+
+const COUNTRIES = [
+  { id: 'USA', name: 'United States' },
+  { id: 'CHN', name: 'China' },
+  { id: 'DEU', name: 'Germany' },
+  { id: 'JPN', name: 'Japan' },
+  { id: 'GBR', name: 'United Kingdom' },
+  { id: 'AUS', name: 'Australia' },
+  { id: 'BRA', name: 'Brazil' },
+  { id: 'IND', name: 'India' },
+  { id: 'KOR', name: 'South Korea' },
+  { id: 'MEX', name: 'Mexico' },
+  { id: 'TUR', name: 'Turkey' },
+  { id: 'ZAF', name: 'South Africa' },
+];
+
+const WB_CODES = COUNTRIES.map(c => c.id).join(';');
+const thisYear = new Date().getFullYear();
+
+function wbLatest(json, iso3) {
+  const rows = (json[1] || []).filter(r => r.countryiso3code === iso3 && r.value != null);
+  if (!rows.length) return null;
+  rows.sort((a, b) => +b.date - +a.date);
+  return { value: rows[0].value, year: rows[0].date };
+}
+
+async function fetchWB(indicator) {
+  const url = `https://api.worldbank.org/v2/country/${WB_CODES}/indicator/${indicator}?format=json&date=${thisYear - 6}:${thisYear}&per_page=500`;
+  return fetch(url).then(r => r.json());
+}
+
+async function loadRisk() {
+  try {
+    const [gdpData, infData, caData] = await Promise.all([
+      fetchWB('NY.GDP.PCAP.CD'),
+      fetchWB('FP.CPI.TOTL.ZG'),
+      fetchWB('BN.CAB.XOKA.GD.ZS'),
+    ]);
+
+    const rows = COUNTRIES.map(c => {
+      const gdp = wbLatest(gdpData, c.id);
+      const inf = wbLatest(infData, c.id);
+      const ca  = wbLatest(caData, c.id);
+      return {
+        name: c.name, id: c.id,
+        gdppc:   gdp?.value ?? null, gdpYear:  gdp?.year ?? '—',
+        inf:     inf?.value ?? null, infYear:  inf?.year ?? '—',
+        ca:      ca?.value  ?? null, caYear:   ca?.year  ?? '—',
+      };
+    });
+
+    // ── GDP chart ──
+    const gdpSorted = rows.filter(r => r.gdppc !== null).sort((a, b) => b.gdppc - a.gdppc);
+    const cGdp = new Chart(document.getElementById('gdp-chart').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: gdpSorted.map(r => r.name),
+        datasets: [{ label: 'GDP per capita (USD)',
+          data: gdpSorted.map(r => r.gdppc),
+          backgroundColor: gdpSorted.map(r => r.gdppc > 40000 ? '#2e7d32' : r.gdppc > 12000 ? '#e6a23c' : '#c62828') }]
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: { y: { title: { display: true, text: 'USD (current)' },
+          ticks: { callback: v => '$' + Number(v).toLocaleString() } } },
+        maintainAspectRatio: false
+      }
+    });
+    registerChart('income', cGdp);
+    const gdpYears = [...new Set(gdpSorted.map(r => r.gdpYear))].sort().reverse();
+    document.getElementById('gdp-asof').textContent =
+      `World Bank NY.GDP.PCAP.CD. Most recent year per country; latest available: ${gdpYears[0]}.`;
+
+    // ── Inflation chart ──
+    const infSorted = rows.filter(r => r.inf !== null).sort((a, b) => b.inf - a.inf);
+    const cInf = new Chart(document.getElementById('inf-chart').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: infSorted.map(r => r.name),
+        datasets: [{ label: 'CPI Inflation (%)',
+          data: infSorted.map(r => r.inf),
+          backgroundColor: infSorted.map(r => r.inf > 10 ? '#c62828' : r.inf > 4 ? '#e6a23c' : '#2e7d32') }]
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: { y: { title: { display: true, text: 'Annual % change' } } },
+        maintainAspectRatio: false
+      }
+    });
+    registerChart('macro', cInf);
+    const infYears = [...new Set(infSorted.map(r => r.infYear))].sort().reverse();
+    document.getElementById('inf-asof').textContent =
+      `World Bank FP.CPI.TOTL.ZG. Latest available: ${infYears[0]}. Red >10%, amber 4–10%, green <4%.`;
+
+    // ── Current account chart ──
+    const caSorted = rows.filter(r => r.ca !== null).sort((a, b) => b.ca - a.ca);
+    const cCa = new Chart(document.getElementById('ca-chart').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: caSorted.map(r => r.name),
+        datasets: [{ label: 'Current account (% GDP)',
+          data: caSorted.map(r => r.ca),
+          backgroundColor: caSorted.map(r => r.ca >= 0 ? '#2e7d32' : '#c62828') }]
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: { y: { title: { display: true, text: '% of GDP' } } },
+        maintainAspectRatio: false
+      }
+    });
+    registerChart('macro', cCa);
+    const caYears = [...new Set(caSorted.map(r => r.caYear))].sort().reverse();
+    document.getElementById('ca-asof').textContent =
+      `World Bank BN.CAB.XOKA.GD.ZS. Latest available: ${caYears[0]}. Green = surplus, red = deficit.`;
+
+    // ── Comparison table ──
+    const renderRow = r => {
+      const infCls = r.inf === null ? '' : r.inf > 10 ? 'neg' : r.inf > 4 ? '' : 'pos';
+      const caCls  = r.ca  === null ? '' : r.ca >= 0 ? 'pos' : 'neg';
+      return `<tr>
+        <td>${r.name}</td>
+        <td>${r.gdppc != null ? '$' + Math.round(r.gdppc).toLocaleString() : '—'}
+            <small style="color:var(--muted)">${r.gdpYear}</small></td>
+        <td class="${infCls}">${r.inf != null ? r.inf.toFixed(1) + '%' : '—'}
+            <small style="color:var(--muted)">${r.infYear}</small></td>
+        <td class="${caCls}">${r.ca != null ? (r.ca > 0 ? '+' : '') + r.ca.toFixed(1) + '%' : '—'}
+            <small style="color:var(--muted)">${r.caYear}</small></td>
+      </tr>`;
+    };
+    document.querySelector('#risk-table tbody').innerHTML = rows.map(renderRow).join('');
+    initSortTable('risk-table', rows, renderRow);
+    document.getElementById('table-asof').textContent =
+      'World Bank Open Data. Annual series; 1–2 year publication lag. Year shown per country.';
+
+  } catch (e) {
+    ['gdp-asof', 'inf-asof', 'ca-asof', 'table-asof'].forEach(id =>
+      showErr(id, 'Could not load data: ' + e.message));
+  }
+}
+
+loadRisk();
+</script>
+</body>
+</html>

@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>International Finance — Live Data</title>
+<link rel="stylesheet" href="_shared.css">
+<style>
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+    gap: 18px;
+    margin: 24px 0;
+  }
+  .mcard {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px 22px 18px;
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    transition: box-shadow 0.15s, border-color 0.15s;
+  }
+  .mcard:hover {
+    box-shadow: 0 4px 18px rgba(0,0,0,.11);
+    border-color: var(--accent);
+  }
+  .mcard h2 {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--accent);
+    margin: 0 0 5px;
+  }
+  .mcard .msub {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .mcard p {
+    font-size: 13px;
+    color: #444;
+    line-height: 1.55;
+    margin: 0 0 12px;
+    flex: 1;
+  }
+  .tags { display: flex; flex-wrap: wrap; gap: 5px; }
+  .tag {
+    font-size: 11px;
+    padding: 2px 7px;
+    border-radius: 3px;
+    background: #e8f0fc;
+    color: var(--accent);
+  }
+  .badge {
+    display: inline-block;
+    width: 28px;
+    height: 28px;
+    line-height: 28px;
+    text-align: center;
+    border-radius: 6px;
+    background: var(--accent);
+    color: #fff;
+    font-weight: 700;
+    font-size: 13px;
+    margin-bottom: 10px;
+  }
+  .note {
+    background: #f4f6fb;
+    border-left: 3px solid var(--accent);
+    padding: 12px 16px;
+    border-radius: 4px;
+    font-size: 13px;
+    line-height: 1.6;
+    margin: 16px 0;
+    color: #444;
+  }
+  .sources {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 28px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    line-height: 1.8;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>International Finance — Live Data Modules</h1>
+  <div class="sub">Standalone HTML dashboards · Data refreshes on every page load · No login or API keys required</div>
+</header>
+
+<main>
+  <div class="note">
+    Each module pulls current data from public APIs (OECD, World Bank, ECB/Frankfurter, IMF, The Economist) every time the page loads.
+    Open any file by double-clicking it — no server, no installation.
+    All modules also work when served via a local web server.
+  </div>
+
+  <div class="grid">
+
+    <a class="mcard" href="ppp-irp.html">
+      <div class="badge">PP</div>
+      <h2>Purchasing Power Parity &amp; Interest Rate Parity</h2>
+      <div class="msub">Big Mac Index · IRP forward calculator · Inflation &amp; real rates</div>
+      <p>Live Big Mac prices and implied PPP valuations for 35+ countries. Covered IRP calculator using live spot rates and interbank rates. Real interest rate differentials using OECD monthly rates and IMF inflation estimates.</p>
+      <div class="tags">
+        <span class="tag">Big Mac CSV</span>
+        <span class="tag">OECD STES</span>
+        <span class="tag">IMF DataMapper</span>
+        <span class="tag">Frankfurter/ECB</span>
+      </div>
+    </a>
+
+    <a class="mcard" href="fx-rates.html">
+      <div class="badge">FX</div>
+      <h2>Exchange Rates</h2>
+      <div class="msub">Live ECB rates · 1-year performance · Cross-rate calculator</div>
+      <p>Daily ECB reference rates for 16 major currencies versus USD. One-year appreciation and depreciation chart. Implied cross rates via triangular arbitrage using USD as the common anchor.</p>
+      <div class="tags">
+        <span class="tag">Frankfurter/ECB</span>
+      </div>
+    </a>
+
+    <a class="mcard" href="sovereign-yields.html">
+      <div class="badge">BY</div>
+      <h2>International Bond Markets</h2>
+      <div class="msub">10-yr government yields · Spreads vs US · Yield curve slope</div>
+      <p>Monthly 10-year government bond yields for 15 economies from OECD. Spread over the US 10-yr Treasury as a country risk premium gauge. Policy rate vs long-term yield comparison with yield curve slope in basis points.</p>
+      <div class="tags">
+        <span class="tag">OECD IRLT</span>
+        <span class="tag">OECD IRSTCI</span>
+      </div>
+    </a>
+
+    <a class="mcard" href="money-markets.html">
+      <div class="badge">MM</div>
+      <h2>Global Money Markets</h2>
+      <div class="msub">Central bank policy rates · 3-month interbank · Rate differentials</div>
+      <p>Central bank policy rates for 11 major economies (Fed, ECB, BoE, BoJ, BoC, RBA, and more). 3-month interbank rates — SOFR, EURIBOR, and equivalents. Rate differentials versus the US Fed Funds rate for carry-trade context.</p>
+      <div class="tags">
+        <span class="tag">OECD IRSTCI</span>
+        <span class="tag">OECD IR3TIB</span>
+      </div>
+    </a>
+
+    <a class="mcard" href="country-risk.html">
+      <div class="badge">CR</div>
+      <h2>Country Risk Analysis</h2>
+      <div class="msub">GDP per capita · Inflation · Current account · Country ranking</div>
+      <p>World Bank macro indicators for 12 major economies. GDP per capita as an income-level proxy, inflation as a monetary stability signal, current account balance as an external vulnerability measure. Sortable comparison table across all indicators.</p>
+      <div class="tags">
+        <span class="tag">World Bank</span>
+      </div>
+    </a>
+
+    <a class="mcard" href="fx-volatility.html">
+      <div class="badge">VL</div>
+      <h2>FX Risk &amp; Volatility</h2>
+      <div class="msub">Annualized hist. vol · Rolling 30-day · Risk ranking</div>
+      <p>Annualized historical volatility (standard deviation of daily log returns × √252) for 9 major currencies versus USD, based on the past year of ECB reference rates. Rolling 30-day volatility chart reveals when currency risk spiked.</p>
+      <div class="tags">
+        <span class="tag">Frankfurter/ECB</span>
+      </div>
+    </a>
+
+    <a class="mcard" href="fx-regimes.html">
+      <div class="badge">RG</div>
+      <h2>Exchange Rate Regimes &amp; Reserves</h2>
+      <div class="msub">FX reserve rankings · Peg vs float · Currency anchors</div>
+      <p>Foreign exchange reserve stockpiles (World Bank, USD billions) for 16 countries. Regime classification table covering free floats, managed floats, soft pegs, currency boards, and conventional pegs — with anchor details and flexibility scores.</p>
+      <div class="tags">
+        <span class="tag">World Bank</span>
+        <span class="tag">IMF AREAER</span>
+      </div>
+    </a>
+
+  </div>
+
+  <div class="sources">
+    <strong>Data sources &amp; update frequency</strong><br>
+    OECD Short-Term Economic Statistics (STES) — interest rates, bond yields — monthly, ~4–6 week lag<br>
+    Frankfurter / ECB reference rates — FX spot and history — daily (business days)<br>
+    World Bank Open Data — GDP, inflation, current account, FX reserves — annual, 1–2 year lag<br>
+    IMF DataMapper — inflation forecasts — annual update (current-year estimate available)<br>
+    The Economist Big Mac Index CSV — implied PPP, raw prices — updated January &amp; July<br>
+    IMF AREAER — regime classifications — annual publication, static in this module
+  </div>
+</main>
+
+<footer>
+  All modules open from local files. No server, no API keys, no subscriptions required.
+  Refresh any page to reload the latest available data.
+</footer>
+
+</body>
+</html>

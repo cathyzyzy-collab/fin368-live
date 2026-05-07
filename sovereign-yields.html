@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>International Bond Markets</title>
+<link rel="stylesheet" href="_shared.css">
+</head>
+<body>
+
+<header>
+  <h1>International Bond Markets</h1>
+  <div class="sub">Live government bond yields · Spread over US Treasury · Policy vs. long-term rates &nbsp;|&nbsp; <a href="index.html">← All modules</a></div>
+</header>
+
+<nav class="tabs">
+  <button data-tab="yields10" class="active">10-Year Yields</button>
+  <button data-tab="spreads">Spreads vs US</button>
+  <button data-tab="curve">Policy vs. Long-Term</button>
+</nav>
+
+<main>
+
+<!-- ═══ 10-YR ═══ -->
+<section id="yields10" class="tab active">
+  <h2>10-Year Government Bond Yields</h2>
+  <div class="desc">Long-term sovereign yields reflect expected inflation, growth, and country risk. Higher yields signal higher risk premiums or tighter monetary policy expectations.</div>
+
+  <div class="card">
+    <div class="canvas-wrap" style="height:380px"><canvas id="y10-chart"></canvas></div>
+    <div class="asof" id="y10-asof"><span class="loading">Loading…</span></div>
+  </div>
+
+  <div class="card">
+    <h3>Detail</h3>
+    <table id="y10-table">
+      <thead><tr>
+        <th data-sort="name" data-dir="asc">Country</th>
+        <th data-sort="yield">10-yr yield (%)</th>
+        <th data-sort="period">As of</th>
+      </tr></thead>
+      <tbody><tr><td colspan="3" class="loading">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ═══ SPREADS ═══ -->
+<section id="spreads" class="tab">
+  <h2>Spread over US 10-Year Treasury</h2>
+  <div class="desc">The spread is the yield premium (or discount) relative to the US benchmark. Wide spreads indicate higher perceived risk or very different rate cycles.</div>
+
+  <div class="card">
+    <div class="canvas-wrap" style="height:380px"><canvas id="sp-chart"></canvas></div>
+    <div class="asof" id="sp-asof"><span class="loading">Loading…</span></div>
+  </div>
+</section>
+
+<!-- ═══ CURVE ═══ -->
+<section id="curve" class="tab">
+  <h2>Policy Rate vs. 10-Year Yield</h2>
+  <div class="desc">The gap between the central bank rate and the long-term yield reveals the slope of the yield curve. Negative (inverted curve) often precedes recession; steep positive curve signals growth expectations.</div>
+
+  <div class="card">
+    <div class="canvas-wrap" style="height:380px"><canvas id="cv-chart"></canvas></div>
+    <div class="asof" id="cv-asof"><span class="loading">Loading…</span></div>
+  </div>
+
+  <div class="card">
+    <h3>Curve slope = 10-yr yield − policy rate</h3>
+    <table id="cv-table">
+      <thead><tr>
+        <th data-sort="name" data-dir="asc">Country</th>
+        <th data-sort="policy">Policy rate (%)</th>
+        <th data-sort="lt">10-yr yield (%)</th>
+        <th data-sort="slope">Slope (bps)</th>
+      </tr></thead>
+      <tbody><tr><td colspan="4" class="loading">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <strong>Source:</strong> <a href="https://stats.oecd.org" target="_blank">OECD Short-Term Economic Statistics (STES)</a> — IRLT (10-yr long-term rate) & IRSTCI (central bank rate). Monthly, ~4–6 week lag.
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+<script src="_shared.js"></script>
+<script>
+initTabs();
+
+const COUNTRIES = [
+  { id: 'USA', name: 'United States' }, { id: 'DEU', name: 'Germany' },
+  { id: 'GBR', name: 'United Kingdom' }, { id: 'JPN', name: 'Japan' },
+  { id: 'CAN', name: 'Canada' }, { id: 'AUS', name: 'Australia' },
+  { id: 'FRA', name: 'France' }, { id: 'ITA', name: 'Italy' },
+  { id: 'ESP', name: 'Spain' }, { id: 'KOR', name: 'South Korea' },
+  { id: 'MEX', name: 'Mexico' }, { id: 'BRA', name: 'Brazil' },
+  { id: 'IND', name: 'India' }, { id: 'CHN', name: 'China' },
+  { id: 'TUR', name: 'Turkey' },
+];
+const CODES = COUNTRIES.map(c => c.id).join('+');
+
+async function loadYields() {
+  try {
+    const [lt, policy] = await Promise.all([
+      fetchOecd(CODES, 'IRLT'),
+      fetchOecd(CODES, 'IRSTCI')
+    ]);
+
+    const rows = COUNTRIES.map(c => {
+      const l = lt[c.id], p = policy[c.id];
+      return { name: c.name, id: c.id,
+        yield: l?.value ?? null, period: l?.period ?? '—',
+        policy: p?.value ?? null, ppd: p?.period ?? '—',
+        slope: (l && p) ? +((l.value - p.value) * 100).toFixed(0) : null };
+    }).filter(r => r.yield !== null);
+
+    const usYield = rows.find(r => r.id === 'USA')?.yield ?? 0;
+
+    // ── 10-yr chart ──
+    const sorted10 = [...rows].sort((a, b) => (b.yield ?? 0) - (a.yield ?? 0));
+    const c10 = new Chart(document.getElementById('y10-chart').getContext('2d'), {
+      type: 'bar',
+      data: { labels: sorted10.map(r => r.name), datasets: [{ label: '10-yr yield %', data: sorted10.map(r => r.yield), backgroundColor: sorted10.map(r => r.yield > 6 ? '#c62828' : r.id === 'USA' ? '#e6a23c' : '#1d4e89') }] },
+      options: { plugins: { legend: { display: false } }, scales: { y: { title: { display: true, text: 'Yield (%)' } } }, maintainAspectRatio: false }
+    });
+    registerChart('yields10', c10);
+
+    const periods = [...new Set(rows.map(r => r.period))].sort().reverse();
+    document.getElementById('y10-asof').textContent = `OECD STES (IRLT). Most recent reading per country; latest: ${periods[0]}.`;
+
+    const render10 = r => `<tr><td>${r.name}</td><td>${fmt(r.yield)}</td><td>${r.period}</td></tr>`;
+    document.querySelector('#y10-table tbody').innerHTML = rows.map(render10).join('');
+    initSortTable('y10-table', rows, render10);
+
+    // ── Spread chart ──
+    const spread = rows.map(r => ({ ...r, spread: r.yield !== null ? +(r.yield - usYield).toFixed(2) : null })).filter(r => r.id !== 'USA' && r.spread !== null).sort((a, b) => (b.spread ?? 0) - (a.spread ?? 0));
+    const cSp = new Chart(document.getElementById('sp-chart').getContext('2d'), {
+      type: 'bar',
+      data: { labels: spread.map(r => r.name), datasets: [{ label: 'Spread vs US 10-yr (pp)', data: spread.map(r => r.spread), backgroundColor: spread.map(r => r.spread > 0 ? '#c62828' : '#2e7d32') }] },
+      options: { plugins: { legend: { display: false } }, scales: { y: { title: { display: true, text: 'Percentage points above (+) / below (−) US yield' } } }, maintainAspectRatio: false }
+    });
+    registerChart('spreads', cSp);
+    document.getElementById('sp-asof').textContent = `US 10-yr benchmark: ${fmt(usYield)}%. Positive spread = higher yield than US.`;
+
+    // ── Curve chart ──
+    const crv = rows.filter(r => r.slope !== null).sort((a, b) => (b.slope ?? 0) - (a.slope ?? 0));
+    const cCv = new Chart(document.getElementById('cv-chart').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: crv.map(r => r.name),
+        datasets: [
+          { label: 'Policy rate', data: crv.map(r => r.policy), backgroundColor: '#a8c8f0' },
+          { label: '10-yr yield', data: crv.map(r => r.yield), backgroundColor: '#1d4e89' }
+        ]
+      },
+      options: { plugins: { legend: { display: true } }, scales: { y: { title: { display: true, text: 'Rate (%)' } } }, maintainAspectRatio: false }
+    });
+    registerChart('curve', cCv);
+    document.getElementById('cv-asof').textContent = 'Policy rate = OECD IRSTCI; 10-yr = OECD IRLT.';
+
+    const renderCv = r => {
+      const cls = r.slope >= 0 ? 'pos' : 'neg';
+      return `<tr><td>${r.name}</td><td>${fmt(r.policy)}</td><td>${fmt(r.yield)}</td><td class="${cls}">${r.slope > 0 ? '+' : ''}${r.slope} bps</td></tr>`;
+    };
+    document.querySelector('#cv-table tbody').innerHTML = crv.map(renderCv).join('');
+    initSortTable('cv-table', crv, renderCv);
+
+  } catch (e) {
+    ['y10-asof', 'sp-asof', 'cv-asof'].forEach(id => showErr(id, 'Could not load yield data: ' + e.message));
+  }
+}
+
+loadYields();
+</script>
+</body>
+</html>

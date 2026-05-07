@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Global Money Markets</title>
+<link rel="stylesheet" href="_shared.css">
+</head>
+<body>
+
+<header>
+  <h1>Global Money Markets & Short-Term Rates</h1>
+  <div class="sub">Central bank policy rates · 3-month interbank rates · Rate differentials &nbsp;|&nbsp; <a href="index.html">← All modules</a></div>
+</header>
+
+<nav class="tabs">
+  <button data-tab="policy" class="active">Policy Rates</button>
+  <button data-tab="interbank">3-Month Interbank</button>
+  <button data-tab="diff">Rate Differentials</button>
+</nav>
+
+<main>
+
+<!-- ═══ POLICY ═══ -->
+<section id="policy" class="tab active">
+  <h2>Central Bank Policy Rates</h2>
+  <div class="desc">The rate set by each country's central bank (overnight target or key refinancing rate). Drives the short end of the yield curve and influences FX through covered interest rate parity.</div>
+
+  <div class="card">
+    <div class="canvas-wrap" style="height:380px"><canvas id="pol-chart"></canvas></div>
+    <div class="asof" id="pol-asof"><span class="loading">Loading…</span></div>
+  </div>
+
+  <div class="card">
+    <table id="pol-table">
+      <thead><tr>
+        <th data-sort="name" data-dir="asc">Country / Region</th>
+        <th data-sort="rate">Policy rate (%)</th>
+        <th data-sort="period">As of</th>
+      </tr></thead>
+      <tbody><tr><td colspan="3" class="loading">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ═══ INTERBANK ═══ -->
+<section id="interbank" class="tab">
+  <h2>3-Month Interbank Rates</h2>
+  <div class="desc">3-month rates (e.g. EURIBOR, SOFR-based term rates) are the market-clearing rates for short-term bank lending between institutions. Used to price loans, FRNs, and interest rate swaps.</div>
+
+  <div class="card">
+    <div class="canvas-wrap" style="height:380px"><canvas id="ib-chart"></canvas></div>
+    <div class="asof" id="ib-asof"><span class="loading">Loading…</span></div>
+  </div>
+
+  <div class="card">
+    <table id="ib-table">
+      <thead><tr>
+        <th data-sort="name" data-dir="asc">Country</th>
+        <th data-sort="rate3m">3-month rate (%)</th>
+        <th data-sort="period">As of</th>
+      </tr></thead>
+      <tbody><tr><td colspan="3" class="loading">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ═══ DIFFERENTIALS ═══ -->
+<section id="diff" class="tab">
+  <h2>Interest Rate Differentials vs US</h2>
+  <div class="desc">Rate differentials drive covered and uncovered interest parity, capital flows, and carry-trade strategies. Positive = country rate is above US rate (potential carry-trade destination).</div>
+
+  <div class="card">
+    <h3>3-month differential vs US (policy rate comparison)</h3>
+    <div class="canvas-wrap" style="height:360px"><canvas id="df-chart"></canvas></div>
+    <div class="asof" id="df-asof"><span class="loading">Loading…</span></div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <strong>Source:</strong> <a href="https://stats.oecd.org" target="_blank">OECD STES</a> — IRSTCI (central bank rate) and IR3TIB (3-month interbank). Monthly; ~4–6 week lag. SOFR and EURIBOR are the post-LIBOR benchmarks; OECD IR3TIB reflects these or equivalent market rates.
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+<script src="_shared.js"></script>
+<script>
+initTabs();
+
+const COUNTRIES = [
+  { id: 'USA', name: 'United States (Fed)' },
+  { id: 'DEU', name: 'Eurozone (ECB)' },
+  { id: 'GBR', name: 'United Kingdom (BoE)' },
+  { id: 'JPN', name: 'Japan (BoJ)' },
+  { id: 'CAN', name: 'Canada (BoC)' },
+  { id: 'AUS', name: 'Australia (RBA)' },
+  { id: 'NOR', name: 'Norway (Norges Bank)' },
+  { id: 'CHE', name: 'Switzerland (SNB)' },
+  { id: 'KOR', name: 'South Korea (BoK)' },
+  { id: 'MEX', name: 'Mexico (Banxico)' },
+  { id: 'TUR', name: 'Turkey (TCMB)' },
+];
+const CODES = COUNTRIES.map(c => c.id).join('+');
+
+async function loadRates() {
+  try {
+    const [policy, ib3m] = await Promise.all([
+      fetchOecd(CODES, 'IRSTCI'),
+      fetchOecd(CODES, 'IR3TIB')
+    ]);
+
+    const usRate = policy['USA']?.value ?? 0;
+    const usIb   = ib3m['USA']?.value ?? 0;
+
+    // Build rows
+    const polRows = COUNTRIES.map(c => {
+      const r = policy[c.id];
+      return r ? { name: c.name, id: c.id, rate: r.value, period: r.period } : null;
+    }).filter(Boolean).sort((a, b) => b.rate - a.rate);
+
+    const ibRows = COUNTRIES.map(c => {
+      const r = ib3m[c.id];
+      return r ? { name: c.name, id: c.id, rate3m: r.value, period: r.period } : null;
+    }).filter(Boolean).sort((a, b) => b.rate3m - a.rate3m);
+
+    // ── Policy chart ──
+    const cPol = new Chart(document.getElementById('pol-chart').getContext('2d'), {
+      type: 'bar',
+      data: { labels: polRows.map(r => r.name), datasets: [{ label: 'Policy rate %', data: polRows.map(r => r.rate), backgroundColor: polRows.map(r => r.id === 'USA' ? '#e6a23c' : '#1d4e89') }] },
+      options: { plugins: { legend: { display: false } }, scales: { y: { title: { display: true, text: 'Policy rate (%)' } } }, maintainAspectRatio: false }
+    });
+    registerChart('policy', cPol);
+
+    const latestPol = [...new Set(polRows.map(r => r.period))].sort().reverse()[0];
+    document.getElementById('pol-asof').textContent = `OECD IRSTCI. Most recent reading per country; latest available: ${latestPol}.`;
+
+    const renderPol = r => `<tr><td>${r.name}</td><td>${fmt(r.rate, 3)}</td><td>${r.period}</td></tr>`;
+    document.querySelector('#pol-table tbody').innerHTML = polRows.map(renderPol).join('');
+    initSortTable('pol-table', polRows, renderPol);
+
+    // ── Interbank chart ──
+    const cIb = new Chart(document.getElementById('ib-chart').getContext('2d'), {
+      type: 'bar',
+      data: { labels: ibRows.map(r => r.name), datasets: [{ label: '3-month rate %', data: ibRows.map(r => r.rate3m), backgroundColor: ibRows.map(r => r.id === 'USA' ? '#e6a23c' : '#1d4e89') }] },
+      options: { plugins: { legend: { display: false } }, scales: { y: { title: { display: true, text: '3-month rate (%)' } } }, maintainAspectRatio: false }
+    });
+    registerChart('interbank', cIb);
+
+    const latestIb = [...new Set(ibRows.map(r => r.period))].sort().reverse()[0];
+    document.getElementById('ib-asof').textContent = `OECD IR3TIB. Latest available: ${latestIb}.`;
+
+    const renderIb = r => `<tr><td>${r.name}</td><td>${fmt(r.rate3m, 3)}</td><td>${r.period}</td></tr>`;
+    document.querySelector('#ib-table tbody').innerHTML = ibRows.map(renderIb).join('');
+    initSortTable('ib-table', ibRows, renderIb);
+
+    // ── Differential chart ──
+    const diffRows = polRows.filter(r => r.id !== 'USA').map(r => ({ ...r, diff: +(r.rate - usRate).toFixed(3) })).sort((a, b) => b.diff - a.diff);
+    const cDf = new Chart(document.getElementById('df-chart').getContext('2d'), {
+      type: 'bar',
+      data: { labels: diffRows.map(r => r.name), datasets: [{ label: 'Differential vs US (%)', data: diffRows.map(r => r.diff), backgroundColor: diffRows.map(r => r.diff >= 0 ? '#2e7d32' : '#c62828') }] },
+      options: { plugins: { legend: { display: false } }, scales: { y: { title: { display: true, text: '% above (+) / below (−) US policy rate' } } }, maintainAspectRatio: false }
+    });
+    registerChart('diff', cDf);
+    document.getElementById('df-asof').textContent = `US policy rate benchmark: ${fmt(usRate, 3)}%. Positive = higher rate than US (potential carry-trade candidate if FX risk is hedged).`;
+
+  } catch (e) {
+    ['pol-asof', 'ib-asof', 'df-asof'].forEach(id => showErr(id, 'Could not load rate data: ' + e.message));
+  }
+}
+
+loadRates();
+</script>
+</body>
+</html>

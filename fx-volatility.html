@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FX Risk &amp; Volatility</title>
+<link rel="stylesheet" href="_shared.css">
+</head>
+<body>
+
+<header>
+  <h1>FX Risk &amp; Volatility</h1>
+  <div class="sub">Annualized historical volatility · Rolling 30-day vol · Currency risk ranking &nbsp;|&nbsp; <a href="index.html">← All modules</a></div>
+</header>
+
+<nav class="tabs">
+  <button data-tab="annual" class="active">Annual Volatility</button>
+  <button data-tab="rolling">Rolling 30-Day Vol</button>
+</nav>
+
+<main>
+
+<!-- ═══ ANNUAL ═══ -->
+<section id="annual" class="tab active">
+  <h2>Annualized Historical Volatility vs USD</h2>
+  <div class="desc">Historical volatility = annualized standard deviation of daily log returns (×√252). A 10% annualized vol implies a typical daily move of ~0.63%. Higher vol = more FX risk for importers, exporters, and unhedged foreign-currency positions.</div>
+
+  <div class="card">
+    <div class="canvas-wrap" style="height:400px"><canvas id="vol-chart"></canvas></div>
+    <div class="asof" id="vol-asof"><span class="loading">Loading…</span></div>
+  </div>
+
+  <div class="card">
+    <table id="vol-table">
+      <thead><tr>
+        <th data-sort="name" data-dir="asc">Currency</th>
+        <th data-sort="code">Code</th>
+        <th data-sort="vol">Annual vol (%)</th>
+        <th data-sort="dailyVol">Daily vol (%)</th>
+        <th data-sort="obs">Trading days</th>
+      </tr></thead>
+      <tbody><tr><td colspan="5" class="loading">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ═══ ROLLING ═══ -->
+<section id="rolling" class="tab">
+  <h2>Rolling 30-Day Volatility</h2>
+  <div class="desc">A 30-day rolling window of annualized volatility shows how currency risk has evolved over the past year. Spikes often correspond to central bank surprises, elections, geopolitical events, or liquidity stress. Toggle currencies using the buttons below.</div>
+
+  <div class="card">
+    <div id="ccyPicker" style="display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px"></div>
+    <div class="canvas-wrap" style="height:400px"><canvas id="roll-chart"></canvas></div>
+    <div class="asof" id="roll-asof"></div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <strong>Source:</strong> <a href="https://frankfurter.dev" target="_blank">Frankfurter (ECB reference rates)</a> — 1-year daily history. Volatility = std dev of daily log returns × √252. ECB reference rates are fixing rates, not tradable mid-market — vol is slightly understated vs interbank vol.
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+<script src="_shared.js"></script>
+<script>
+initTabs();
+
+const CURRENCIES = [
+  { code: 'EUR', name: 'Euro',              color: '#1565c0' },
+  { code: 'GBP', name: 'British Pound',     color: '#6a1b9a' },
+  { code: 'JPY', name: 'Japanese Yen',      color: '#e65100' },
+  { code: 'CHF', name: 'Swiss Franc',       color: '#c62828' },
+  { code: 'CAD', name: 'Canadian Dollar',   color: '#2e7d32' },
+  { code: 'AUD', name: 'Australian Dollar', color: '#827717' },
+  { code: 'CNY', name: 'Chinese Yuan',      color: '#ad1457' },
+  { code: 'MXN', name: 'Mexican Peso',      color: '#00695c' },
+  { code: 'BRL', name: 'Brazilian Real',    color: '#4e342e' },
+];
+
+const SYMS = CURRENCIES.map(c => c.code).join(',');
+let allDates = [], ratesByDate = {}, rollChart = null;
+
+function stddev(arr) {
+  const valid = arr.filter(v => v !== null && !isNaN(v));
+  const n = valid.length;
+  if (n < 2) return 0;
+  const mean = valid.reduce((s, v) => s + v, 0) / n;
+  return Math.sqrt(valid.reduce((s, v) => s + (v - mean) ** 2, 0) / (n - 1));
+}
+
+function computeReturns(dates, code) {
+  return dates.slice(1).map((_, i) => {
+    const prev = ratesByDate[dates[i]]?.[code];
+    const curr = ratesByDate[dates[i + 1]]?.[code];
+    return (prev > 0 && curr > 0) ? Math.log(curr / prev) : null;
+  });
+}
+
+function rollingVol(returns, window = 30) {
+  return returns.map((_, i) => {
+    if (i + 1 < window) return null;
+    return +(stddev(returns.slice(i - window + 1, i + 1)) * Math.sqrt(252) * 100).toFixed(2);
+  });
+}
+
+async function loadVol() {
+  try {
+    const end   = new Date().toISOString().slice(0, 10);
+    const start = new Date(Date.now() - 366 * 86400000).toISOString().slice(0, 10);
+    const r = await fetch(
+      `https://api.frankfurter.dev/v1/${start}..${end}?base=USD&symbols=${SYMS}`
+    ).then(r => r.json());
+
+    ratesByDate = r.rates;
+    allDates = Object.keys(ratesByDate).sort();
+
+    // Annualized vol per currency
+    const volRows = CURRENCIES.map(c => {
+      const rets = computeReturns(allDates, c.code);
+      const annVol   = +(stddev(rets) * Math.sqrt(252) * 100).toFixed(2);
+      const dailyVol = +(stddev(rets) * 100).toFixed(3);
+      const obs      = rets.filter(v => v !== null).length;
+      return { name: c.name, code: c.code, vol: annVol, dailyVol, obs, color: c.color };
+    }).sort((a, b) => b.vol - a.vol);
+
+    const cVol = new Chart(document.getElementById('vol-chart').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: volRows.map(r => r.code),
+        datasets: [{ label: 'Annual vol %', data: volRows.map(r => r.vol),
+          backgroundColor: volRows.map(r => r.vol > 15 ? '#c62828' : r.vol > 8 ? '#e6a23c' : '#2e7d32') }]
+      },
+      options: {
+        plugins: { legend: { display: false },
+          tooltip: { callbacks: { title: i => volRows[i[0].dataIndex].name } } },
+        scales: { y: { title: { display: true, text: 'Annualized volatility (%)' } } },
+        maintainAspectRatio: false
+      }
+    });
+    registerChart('annual', cVol);
+    document.getElementById('vol-asof').textContent =
+      `Frankfurter/ECB. Period: ${r.start_date} – ${r.end_date}. Red >15%, amber 8–15%, green <8%.`;
+
+    const renderVol = r => `<tr>
+      <td>${r.name}</td><td>${r.code}</td>
+      <td class="${r.vol > 15 ? 'neg' : r.vol > 8 ? '' : 'pos'}">${fmt(r.vol)}%</td>
+      <td>${fmt(r.dailyVol, 3)}%</td><td>${r.obs}</td>
+    </tr>`;
+    document.querySelector('#vol-table tbody').innerHTML = volRows.map(renderVol).join('');
+    initSortTable('vol-table', volRows, renderVol);
+
+    // Rolling vol — build currency toggle buttons
+    const picker = document.getElementById('ccyPicker');
+    const defaultOn = new Set(['EUR', 'JPY', 'GBP']);
+    CURRENCIES.forEach(c => {
+      const btn = document.createElement('button');
+      btn.textContent = c.code;
+      const on = defaultOn.has(c.code);
+      btn.style.cssText = `padding:4px 12px;border-radius:4px;cursor:pointer;border:2px solid ${c.color};background:${on ? c.color : 'transparent'};color:${on ? '#fff' : c.color};font-size:13px;font-weight:600`;
+      btn.dataset.code = c.code;
+      btn.dataset.on   = on ? '1' : '0';
+      btn.onclick = () => {
+        const active = btn.dataset.on === '1';
+        btn.dataset.on = active ? '0' : '1';
+        btn.style.background = active ? 'transparent' : c.color;
+        btn.style.color      = active ? c.color : '#fff';
+        updateRolling();
+      };
+      picker.appendChild(btn);
+    });
+
+    // Return dates align with allDates[1..], rolling window needs 30 points → start at allDates[30]
+    const rollLabels = allDates.slice(30);
+
+    function updateRolling() {
+      const selected = [...picker.querySelectorAll('button[data-on="1"]')].map(b => b.dataset.code);
+      const datasets = selected.map(code => {
+        const c    = CURRENCIES.find(x => x.code === code);
+        const rets = computeReturns(allDates, code);
+        const rv   = rollingVol(rets, 30).slice(29); // drop first 29 nulls
+        return {
+          label: code, data: rv,
+          borderColor: c.color, backgroundColor: 'transparent',
+          pointRadius: 0, tension: 0.2, fill: false, borderWidth: 1.8,
+        };
+      });
+
+      if (rollChart) {
+        rollChart.data.labels   = rollLabels;
+        rollChart.data.datasets = datasets;
+        rollChart.update();
+      } else {
+        rollChart = new Chart(document.getElementById('roll-chart').getContext('2d'), {
+          type: 'line',
+          data: { labels: rollLabels, datasets },
+          options: {
+            plugins: { legend: { display: true } },
+            scales: { y: { title: { display: true, text: 'Rolling 30-day annualized vol (%)' } } },
+            maintainAspectRatio: false
+          }
+        });
+        registerChart('rolling', rollChart);
+      }
+      document.getElementById('roll-asof').textContent =
+        `30-day rolling window of annualized vol. Toggle currencies above.`;
+    }
+
+    updateRolling();
+
+  } catch (e) {
+    showErr('vol-asof',  'Could not load volatility data: ' + e.message);
+    showErr('roll-asof', 'Could not load volatility data: ' + e.message);
+  }
+}
+
+loadVol();
+</script>
+</body>
+</html>

@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Purchasing Power Parity & Interest Rate Parity</title>
+<link rel="stylesheet" href="_shared.css">
+</head>
+<body>
+
+<header>
+  <h1>Purchasing Power Parity & Interest Rate Parity</h1>
+  <div class="sub">Live data — Big Mac Index · ECB spot rates · IMF inflation · OECD short-term rates &nbsp;|&nbsp; <a href="index.html">← All modules</a></div>
+</header>
+
+<nav class="tabs">
+  <button data-tab="bigmac" class="active">Big Mac Index (PPP)</button>
+  <button data-tab="irp">Interest Rate Parity</button>
+  <button data-tab="realrates">Inflation & Real Rates</button>
+</nav>
+
+<main>
+
+<!-- ═══════════ BIG MAC ═══════════ -->
+<section id="bigmac" class="tab active">
+  <h2>The Big Mac Index — Live PPP Snapshot</h2>
+  <div class="desc">The Economist's hamburger test of purchasing power parity: if exchange rates were at PPP, a Big Mac would cost the same in every country. The gap reveals over- or under-valuation.</div>
+
+  <div class="card">
+    <div class="row">
+      <label>Spotlight country
+        <select id="bm-country"><option>(loading…)</option></select>
+      </label>
+      <button class="go" onclick="bigmacFocus()">Compare vs. US</button>
+    </div>
+    <div id="bm-kpis" style="margin-top:16px"></div>
+    <div id="bm-explain" style="margin-top:8px;font-size:14px;color:var(--muted)"></div>
+  </div>
+
+  <div class="card">
+    <h3>Over- / under-valuation vs. US Dollar (all countries)</h3>
+    <div class="canvas-wrap" id="bm-chart-wrap"><canvas id="bm-chart"></canvas></div>
+    <div class="asof" id="bm-asof"></div>
+  </div>
+
+  <div class="card">
+    <h3>All countries — sortable</h3>
+    <table id="bm-table">
+      <thead><tr>
+        <th data-sort="name" data-dir="asc">Country</th>
+        <th data-sort="currency_code">Currency</th>
+        <th data-sort="local_price">Local price</th>
+        <th data-sort="dollar_ex">Mkt rate (per USD)</th>
+        <th data-sort="implied">Implied PPP rate</th>
+        <th data-sort="dollar_price">USD price</th>
+        <th data-sort="USD_raw">vs USD</th>
+      </tr></thead>
+      <tbody><tr><td colspan="7" class="loading">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ═══════════ IRP ═══════════ -->
+<section id="irp" class="tab">
+  <h2>Covered Interest Rate Parity — Forward Calculator</h2>
+  <div class="desc">Under covered IRP, the no-arbitrage forward rate is determined by the spot rate and the interest differential. Higher-rate currency must trade at a forward discount to prevent riskless profits.</div>
+
+  <div class="card">
+    <div class="formula">F = S &times; (1 + i<sub>quote</sub>)<sup>T</sup> / (1 + i<sub>base</sub>)<sup>T</sup></div>
+    <div class="row" style="margin-top:14px">
+      <label>Base currency<select id="irp-base"><option value="USD" selected>USD</option><option>EUR</option><option>GBP</option><option>JPY</option><option>CHF</option><option>CAD</option><option>AUD</option><option>CNY</option></select></label>
+      <label>Quote currency<select id="irp-quote"><option>USD</option><option value="EUR" selected>EUR</option><option>GBP</option><option>JPY</option><option>CHF</option><option>CAD</option><option>AUD</option><option>CNY</option></select></label>
+      <label>Tenor (years)<input id="irp-t" type="number" value="1" step="0.25" min="0.083"></label>
+      <label>Base rate % p.a.<input id="irp-ib" type="number" value="4.30" step="0.05"></label>
+      <label>Quote rate % p.a.<input id="irp-iq" type="number" value="2.40" step="0.05"></label>
+      <button class="go" onclick="irpCompute()">Compute</button>
+    </div>
+    <div class="asof" id="irp-asof">Loading spot rate…</div>
+  </div>
+
+  <div class="card" id="irp-out" style="display:none">
+    <div id="irp-kpis"></div>
+    <div id="irp-interp" style="margin-top:12px;font-size:14.5px;line-height:1.65"></div>
+  </div>
+</section>
+
+<!-- ═══════════ REAL RATES ═══════════ -->
+<section id="realrates" class="tab">
+  <h2>Inflation & Real Interest Rates — Major Economies</h2>
+  <div class="desc">Countries with higher inflation tend to see their currencies depreciate (absolute PPP). Real interest rate differentials drive capital flows and long-run exchange rate trends.</div>
+
+  <div class="card">
+    <h3>Inflation — current year estimate (IMF) or latest annual (World Bank)</h3>
+    <div class="canvas-wrap" style="height:320px"><canvas id="rr-cpi"></canvas></div>
+    <div class="asof" id="rr-cpi-asof"><span class="loading">Loading…</span></div>
+  </div>
+
+  <div class="card">
+    <h3>Approximate real interest rate = short-term nominal rate (OECD) − inflation</h3>
+    <div class="canvas-wrap" style="height:320px"><canvas id="rr-real"></canvas></div>
+    <div class="asof" id="rr-real-asof"><span class="loading">Loading…</span></div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <strong>Sources:</strong>
+  <a href="https://github.com/TheEconomist/big-mac-data" target="_blank">The Economist — Big Mac Index</a> ·
+  <a href="https://frankfurter.dev" target="_blank">Frankfurter (ECB FX)</a> ·
+  <a href="https://data.imf.org" target="_blank">IMF DataMapper</a> ·
+  <a href="https://stats.oecd.org" target="_blank">OECD STES</a> ·
+  <a href="https://data.worldbank.org" target="_blank">World Bank</a>.
+  All GET requests; nothing uploaded.
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="_shared.js"></script>
+<script>
+initTabs();
+
+// ── Country list (IMF code = OECD code here) ──────────────────────
+const RR = [
+  { id:'USA', name:'United States' }, { id:'JPN', name:'Japan' },
+  { id:'GBR', name:'United Kingdom' }, { id:'CAN', name:'Canada' },
+  { id:'AUS', name:'Australia' }, { id:'DEU', name:'Germany (Eurozone)' },
+  { id:'MEX', name:'Mexico' },
+];
+
+// ═══════════════ BIG MAC ═════════════════════════════════════════════
+let bmRows = [], bmChart = null;
+
+async function loadBigMac() {
+  try {
+    const csv = await fetch('https://raw.githubusercontent.com/TheEconomist/big-mac-data/master/output-data/big-mac-full-index.csv').then(r => r.text());
+    const parsed = Papa.parse(csv, { header: true, dynamicTyping: true, skipEmptyLines: true });
+    const latest = parsed.data.reduce((a, r) => r.date > a ? r.date : a, '');
+    const usa = parsed.data.find(r => r.date === latest && r.iso_a3 === 'USA');
+    bmRows = parsed.data.filter(r => r.date === latest && r.local_price != null)
+      .map(r => ({ ...r, implied: usa ? r.local_price / usa.local_price : null }));
+
+    const sel = document.getElementById('bm-country');
+    sel.innerHTML = '';
+    [...bmRows].sort((a, b) => a.name.localeCompare(b.name)).forEach(r => {
+      const o = Object.assign(document.createElement('option'), { value: r.iso_a3, textContent: r.name });
+      sel.appendChild(o);
+    });
+    sel.value = 'CHN';
+
+    document.getElementById('bm-asof').textContent = `The Economist — Big Mac Index, ${latest}. ${bmRows.length} countries.`;
+    bigmacFocus();
+    drawBmChart();
+    drawBmTable();
+  } catch (e) { showErr('bm-kpis', 'Could not load Big Mac data: ' + e.message); }
+}
+
+function bigmacFocus() {
+  const r = bmRows.find(x => x.iso_a3 === document.getElementById('bm-country').value);
+  const usa = bmRows.find(x => x.iso_a3 === 'USA');
+  if (!r || !usa) return;
+  const cls = r.USD_raw < 0 ? 'neg' : 'pos', word = r.USD_raw < 0 ? 'undervalued' : 'overvalued';
+  document.getElementById('bm-kpis').innerHTML =
+    `<div class="kpi"><div class="lbl">Local price</div><div class="val">${r.currency_code} ${fmt(r.local_price)}</div></div>` +
+    `<div class="kpi"><div class="lbl">Market rate (per USD)</div><div class="val">${fmt(r.dollar_ex, 4)}</div></div>` +
+    `<div class="kpi"><div class="lbl">PPP-implied rate</div><div class="val">${fmt(r.implied, 4)}</div></div>` +
+    `<div class="kpi"><div class="lbl">Price in USD</div><div class="val">$${fmt(r.dollar_price)}</div></div>` +
+    `<div class="kpi"><div class="lbl">vs USD</div><div class="val ${cls}">${(r.USD_raw * 100).toFixed(1)}%</div></div>`;
+  document.getElementById('bm-explain').innerHTML =
+    `A Big Mac costs <b>${r.currency_code} ${fmt(r.local_price)}</b> in ${r.name} vs <b>$${fmt(usa.local_price)}</b> in the US. ` +
+    `PPP implies a rate of <b>${fmt(r.implied, 4)}</b>; the market rate is <b>${fmt(r.dollar_ex, 4)}</b>. ` +
+    `By this measure the ${r.currency_code} is <b class="${cls}">${Math.abs(r.USD_raw * 100).toFixed(1)}% ${word}</b> against the USD.`;
+}
+
+function drawBmChart() {
+  const sorted = [...bmRows].sort((a, b) => a.USD_raw - b.USD_raw);
+  document.getElementById('bm-chart-wrap').style.height = Math.max(400, sorted.length * 14) + 'px';
+  if (bmChart) bmChart.destroy();
+  bmChart = new Chart(document.getElementById('bm-chart').getContext('2d'), {
+    type: 'bar',
+    data: { labels: sorted.map(r => r.name), datasets: [{ label: '% vs USD', data: sorted.map(r => +(r.USD_raw * 100).toFixed(1)), backgroundColor: sorted.map(r => r.USD_raw < 0 ? '#c62828' : '#2e7d32') }] },
+    options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { title: { display: true, text: '% over/under-valued vs USD' } }, y: { ticks: { font: { size: 10 } } } }, maintainAspectRatio: false }
+  });
+  registerChart('bigmac', bmChart);
+}
+
+function drawBmTable() {
+  const rows = [...bmRows];
+  const render = r => {
+    const cls = r.USD_raw < 0 ? 'neg' : 'pos';
+    return `<tr><td>${r.name}</td><td>${r.currency_code}</td><td>${fmt(r.local_price)}</td><td>${fmt(r.dollar_ex, 4)}</td><td>${fmt(r.implied, 4)}</td><td>$${fmt(r.dollar_price)}</td><td class="${cls}">${(r.USD_raw * 100).toFixed(1)}%</td></tr>`;
+  };
+  document.querySelector('#bm-table tbody').innerHTML = rows.map(render).join('');
+  initSortTable('bm-table', rows, render);
+}
+
+// ═══════════════ IRP ══════════════════════════════════════════════════
+let irpSpot = null;
+
+async function loadIrpSpot() {
+  const base = document.getElementById('irp-base').value;
+  const quote = document.getElementById('irp-quote').value;
+  if (base === quote) { document.getElementById('irp-asof').textContent = 'Select two different currencies.'; irpSpot = null; return; }
+  try {
+    const r = await fetchSpot(base, [quote]);
+    irpSpot = r.rates[quote];
+    document.getElementById('irp-asof').textContent = `Spot: 1 ${base} = ${fmt(irpSpot, 4)} ${quote} (ECB reference, ${r.date})`;
+  } catch (e) { showErr('irp-asof', 'Could not load spot rate: ' + e.message); irpSpot = null; }
+}
+
+function irpCompute() {
+  if (!irpSpot) { alert('Spot rate unavailable — check your connection.'); return; }
+  const base = document.getElementById('irp-base').value, quote = document.getElementById('irp-quote').value;
+  const t  = +document.getElementById('irp-t').value;
+  const ib = +document.getElementById('irp-ib').value / 100;
+  const iq = +document.getElementById('irp-iq').value / 100;
+  const F  = irpSpot * Math.pow(1 + iq, t) / Math.pow(1 + ib, t);
+  const bp = (F / irpSpot) - 1;
+  const baseHigher = ib > iq;
+  document.getElementById('irp-out').style.display = 'block';
+  document.getElementById('irp-kpis').innerHTML =
+    `<div class="kpi"><div class="lbl">Spot</div><div class="val">1 ${base} = ${fmt(irpSpot, 4)} ${quote}</div></div>` +
+    `<div class="kpi"><div class="lbl">${t}-yr implied forward</div><div class="val">1 ${base} = ${fmt(F, 4)} ${quote}</div></div>` +
+    `<div class="kpi"><div class="lbl">${base} forward ${bp >= 0 ? 'premium' : 'discount'}</div><div class="val ${bp < 0 ? 'neg' : 'pos'}">${(bp * 100).toFixed(2)}%</div></div>`;
+  const story = baseHigher
+    ? `<b>${base}</b> has the higher rate (${(ib*100).toFixed(2)}% vs ${(iq*100).toFixed(2)}%), so it trades at a <b>forward discount</b> — 1 ${base} buys fewer ${quote} forward. Equivalently, ${quote} is at a forward <b>premium</b>.`
+    : `<b>${base}</b> has the lower rate (${(ib*100).toFixed(2)}% vs ${(iq*100).toFixed(2)}%), so it trades at a <b>forward premium</b> — 1 ${base} buys more ${quote} forward. Equivalently, ${quote} is at a forward <b>discount</b>.`;
+  document.getElementById('irp-interp').innerHTML =
+    `No-arbitrage forward: <b>1 ${base} = ${fmt(F, 4)} ${quote}</b> (vs spot ${fmt(irpSpot, 4)}). ` + story +
+    ` Any market forward that deviates materially implies a covered-arbitrage opportunity: borrow the low-rate currency, convert spot, lend the high-rate currency, lock in the forward.`;
+}
+
+['irp-base', 'irp-quote'].forEach(id => document.getElementById(id).addEventListener('change', loadIrpSpot));
+
+// ═══════════════ REAL RATES ═══════════════════════════════════════════
+async function loadRealRates() {
+  const [nominal, inflation] = await Promise.all([
+    fetchOecd(RR.map(c => c.id).join('+'), 'IR3TIB').catch(() => ({})),
+    fetchInflation(RR.map(c => c.id), RR.map(c => c.id)).catch(() => ({}))
+  ]);
+
+  // Inflation chart
+  const cpiOut = RR.map(c => { const r = inflation[c.id]; return r ? { name: c.name, val: r.value, year: r.year, src: r.source } : null; }).filter(Boolean).sort((a, b) => b.val - a.val);
+  if (cpiOut.length) {
+    const cpiChart = new Chart(document.getElementById('rr-cpi').getContext('2d'), {
+      type: 'bar',
+      data: { labels: cpiOut.map(x => `${x.name} (${x.year})`), datasets: [{ data: cpiOut.map(x => +x.val.toFixed(1)), backgroundColor: cpiOut.map(x => colHeat(x.val)) }] },
+      options: { indexAxis: 'y', plugins: { legend: { display: false } }, maintainAspectRatio: false }
+    });
+    registerChart('realrates', cpiChart);
+    const src = cpiOut[0]?.src || '';
+    document.getElementById('rr-cpi-asof').textContent = `Source: ${src === 'IMF' ? 'IMF DataMapper — current-year estimate' : 'World Bank — most recent annual reading'}.`;
+  } else { showErr('rr-cpi-asof', 'Inflation data unavailable.'); }
+
+  // Real rate chart (nominal − inflation, same year)
+  const realOut = RR.map(c => {
+    const n = nominal[c.id], i = inflation[c.id];
+    if (!n || !i) return null;
+    return { name: c.name, nominal: n.value, inflation: i.value, period: n.period, real: +(n.value - i.value).toFixed(1) };
+  }).filter(Boolean).sort((a, b) => b.real - a.real);
+
+  if (realOut.length) {
+    const realChart = new Chart(document.getElementById('rr-real').getContext('2d'), {
+      type: 'bar',
+      data: { labels: realOut.map(x => `${x.name} (${x.period})`), datasets: [{ data: realOut.map(x => x.real), backgroundColor: realOut.map(x => colPos(x.real)) }] },
+      options: { indexAxis: 'y', maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { afterLabel: ctx => { const r = realOut[ctx.dataIndex]; return `Nominal: ${r.nominal.toFixed(2)}%  Inflation: ${r.inflation.toFixed(1)}%`; } } } } }
+    });
+    registerChart('realrates', realChart);
+    document.getElementById('rr-real-asof').textContent = 'Nominal = OECD 3-month interbank (IR3TIB). Hover for breakdown.';
+  } else { showErr('rr-real-asof', 'Could not compute real rates.'); }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────
+loadBigMac();
+loadIrpSpot();
+loadRealRates();
+</script>
+</body>
+</html>
