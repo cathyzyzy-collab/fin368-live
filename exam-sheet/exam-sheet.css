@@ -1,0 +1,79 @@
+:root {
+  --accent: #1d4e89;
+  --line: #e3e3dc;
+  --warn-bg: #fff8e6;
+  --warn-border: #e6a23c;
+  --good: #2e7d32;
+  --bad: #c62828;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; font: 14px/1.45 -apple-system, "Segoe UI", Roboto, sans-serif; color: #1a1a1a; }
+
+#banner {
+  position: fixed; top: 0; left: 0; right: 0; height: 44px; z-index: 1000;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 16px; background: var(--accent); color: #fff; border-bottom: 1px solid #143a66;
+}
+#banner .title { font-size: 14px; font-weight: 600; letter-spacing: .01em; display: flex; align-items: center; gap: 10px; }
+#banner .title .dot { width: 4px; height: 4px; border-radius: 50%; background: #ffd76b; opacity: .8; }
+#banner .title .caveat { font-weight: 400; font-size: 12px; opacity: .85; }
+#banner .actions { display: flex; gap: 8px; }
+#banner button {
+  background: rgba(255,255,255,.12); color: #fff; border: 1px solid rgba(255,255,255,.35);
+  padding: 5px 12px; border-radius: 4px; font-size: 13px; cursor: pointer; line-height: 1;
+}
+#banner button:hover { background: rgba(255,255,255,.22); }
+
+#luckysheet { position: fixed; top: 44px; left: 0; right: 0; bottom: 0; }
+
+#selftest-panel {
+  position: fixed; top: 60px; right: 16px; width: 540px; max-height: 70vh; overflow: auto;
+  background: #fff; border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 6px 22px rgba(0,0,0,.18);
+  z-index: 1100;
+}
+#selftest-panel .head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; background: var(--warn-bg); border-bottom: 1px solid var(--warn-border);
+  font-size: 13px;
+}
+#selftest-panel .head button { background: #fff; border: 1px solid #ccc; padding: 3px 9px; border-radius: 3px; cursor: pointer; font-size: 12px; }
+#selftest-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+#selftest-table th, #selftest-table td { padding: 6px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+#selftest-table th { background: #f5f5ef; font-weight: 600; }
+#selftest-table td.formula { font-family: Consolas, "Courier New", monospace; color: #444; white-space: nowrap; }
+#selftest-table td.num { font-family: Consolas, "Courier New", monospace; text-align: right; }
+#selftest-table td.ok { color: var(--good); font-weight: 600; text-align: center; }
+#selftest-table td.fail { color: var(--bad); font-weight: 600; text-align: center; }
+
+#help-panel {
+  position: fixed; top: 60px; left: 50%; transform: translateX(-50%);
+  width: 720px; max-width: calc(100vw - 32px); max-height: 80vh; overflow: auto;
+  background: #fff; border: 1px solid var(--line); border-radius: 6px;
+  box-shadow: 0 8px 28px rgba(0,0,0,.22); z-index: 1100;
+}
+#help-panel .head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 18px; background: var(--accent); color: #fff;
+  font-size: 14px; font-weight: 600;
+}
+#help-panel .head button {
+  background: rgba(255,255,255,.15); color: #fff; border: 1px solid rgba(255,255,255,.4);
+  padding: 4px 11px; border-radius: 4px; cursor: pointer; font-size: 12px;
+}
+#help-panel .head button:hover { background: rgba(255,255,255,.28); }
+#help-panel .body { padding: 16px 22px 20px; font-size: 13px; line-height: 1.5; }
+#help-panel h4 { font-size: 13px; font-weight: 700; color: var(--accent); margin: 18px 0 6px; text-transform: uppercase; letter-spacing: .03em; }
+#help-panel h4:first-of-type { margin-top: 0; }
+#help-panel .rule { background: var(--warn-bg); border-left: 3px solid var(--warn-border); padding: 9px 13px; border-radius: 3px; margin: 4px 0 10px; }
+#help-panel table.ref { width: 100%; border-collapse: collapse; }
+#help-panel table.ref td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+#help-panel table.ref td:first-child { width: 38%; white-space: nowrap; }
+#help-panel code {
+  font-family: Consolas, "Courier New", monospace; font-size: 12px;
+  background: #f5f5ef; padding: 1px 5px; border-radius: 3px; color: #1a1a1a;
+}
+
+@media print {
+  #banner, #selftest-panel, #help-panel { display: none !important; }
+  #luckysheet { position: static !important; top: 0 !important; }
+}

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>FIN368 Exam Spreadsheet</title>
+
+  <link rel="stylesheet" href="vendor/plugins/css/pluginsCss.css">
+  <link rel="stylesheet" href="vendor/plugins/plugins.css">
+  <link rel="stylesheet" href="vendor/css/luckysheet.css">
+  <link rel="stylesheet" href="vendor/assets/iconfont/iconfont.css">
+  <link rel="stylesheet" href="exam-sheet.css">
+</head>
+<body>
+
+<div id="banner">
+  <div class="title">
+    FIN368 Exam Spreadsheet
+    <span class="dot"></span>
+    <span class="caveat">Local to this tab. Refresh or close = lost. Use Print or Download CSV to keep your work.</span>
+  </div>
+  <div class="actions">
+    <button id="btn-help" type="button">Functions &amp; syntax</button>
+    <button id="btn-csv" type="button">Download CSV</button>
+    <button id="btn-print" type="button">Print</button>
+  </div>
+</div>
+
+<div id="help-panel" hidden>
+  <div class="head">
+    FIN368 function reference
+    <button id="help-close" type="button">Close</button>
+  </div>
+  <div class="body">
+    <div class="rule">
+      <strong>Rates must be decimals.</strong> Type <code>0.10</code>, not <code>10%</code>. Percent literals give <code>#NAME?</code>.
+      For monthly rates from an annual figure: <code>0.05/12</code>.
+    </div>
+
+    <h4>Capital budgeting</h4>
+    <table class="ref">
+      <tr><td><code>=NPV(rate, val1, val2, ...)</code></td>
+          <td>Discounts each value starting at <strong>t = 1</strong>. To include the t = 0 outlay, add it separately.<br>
+              <em>Canonical:</em> <code>=NPV(0.10, A2:A5) + A1</code> &nbsp; (A1 is the outlay, signed negative)</td></tr>
+      <tr><td><code>=IRR(values, [guess])</code></td>
+          <td>Cash-flow series must include at least one negative and one positive.<br>
+              <em>Example:</em> <code>=IRR(A1:A5)</code></td></tr>
+      <tr><td><code>=MIRR(values, finance_rate, reinvest_rate)</code></td>
+          <td>Both rates required, as decimals. <em>Example:</em> <code>=MIRR(A1:A5, 0.06, 0.10)</code></td></tr>
+      <tr><td><code>=XNPV(rate, values, dates)</code></td>
+          <td>NPV with non-uniform dates. Dates can be a range of date cells.</td></tr>
+      <tr><td><code>=XIRR(values, dates, [guess])</code></td>
+          <td>IRR with non-uniform dates.</td></tr>
+    </table>
+
+    <h4>Loans &amp; time value</h4>
+    <table class="ref">
+      <tr><td><code>=PMT(rate, nper, pv, [fv], [type])</code></td>
+          <td>Payment per period. <em>Mortgage:</em> <code>=PMT(0.05/12, 360, -200000)</code></td></tr>
+      <tr><td><code>=PV(rate, nper, pmt, [fv], [type])</code></td>
+          <td>Present value of an annuity / lump sum.</td></tr>
+      <tr><td><code>=FV(rate, nper, pmt, [pv], [type])</code></td>
+          <td>Future value.</td></tr>
+      <tr><td><code>=RATE(nper, pmt, pv, [fv], [type], [guess])</code></td>
+          <td>Solves for the periodic rate.</td></tr>
+      <tr><td><code>=NPER(rate, pmt, pv, [fv], [type])</code></td>
+          <td>Solves for number of periods.</td></tr>
+    </table>
+
+    <h4>Statistics &amp; risk</h4>
+    <table class="ref">
+      <tr><td><code>=SUM(range)</code> &nbsp; <code>=AVERAGE(range)</code></td><td>Standard.</td></tr>
+      <tr><td><code>=STDEV(range)</code> &nbsp; <code>=STDEVP(range)</code></td>
+          <td>Sample / population standard deviation. The <code>STDEV</code> alias is installed for you.</td></tr>
+      <tr><td><code>=VAR(range)</code> &nbsp; <code>=VARP(range)</code></td>
+          <td>Sample / population variance. The <code>VAR</code> alias is installed.</td></tr>
+      <tr><td><code>=CORREL(rangeX, rangeY)</code></td><td>Correlation coefficient.</td></tr>
+      <tr><td><code>=COVAR(rangeX, rangeY)</code></td><td>Population covariance (<code>COVAR</code> alias installed).</td></tr>
+      <tr><td><code>=MIN, =MAX, =COUNT, =COUNTA</code></td><td>Standard.</td></tr>
+    </table>
+
+    <h4>Math &amp; logic</h4>
+    <table class="ref">
+      <tr><td><code>=POWER(base, exp)</code> or <code>^</code></td>
+          <td><code>=POWER(1.05, 10)</code> &nbsp; or &nbsp; <code>=1.05^10</code></td></tr>
+      <tr><td><code>=SQRT, =EXP, =LN, =LOG, =LOG10</code></td><td>Standard.</td></tr>
+      <tr><td><code>=ABS, =ROUND, =INT</code></td><td>Standard.</td></tr>
+      <tr><td><code>=IF(cond, then, else)</code> &nbsp; <code>=AND, =OR, =NOT</code></td><td>Logical.</td></tr>
+    </table>
+
+    <div class="rule">
+      <strong>Need a value as a percent?</strong> Multiply by 100 yourself:
+      <code>=B5*100</code>. Or right-click the cell &rarr; Format &rarr; Percent (display only, doesn't change the value).
+    </div>
+  </div>
+</div>
+
+<div id="luckysheet"></div>
+
+<div id="selftest-panel" hidden>
+  <div class="head">
+    Self-test &mdash; expected vs computed for the financial functions FIN368 students rely on.
+    <button id="selftest-close" type="button">Close</button>
+  </div>
+  <table id="selftest-table">
+    <thead><tr><th>Function</th><th>Formula</th><th>Expected</th><th>Computed</th><th>OK?</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script src="vendor/plugins/js/plugin.js"></script>
+<script src="vendor/luckysheet.umd.js"></script>
+<script src="exam-sheet.js"></script>
+</body>
+</html>
